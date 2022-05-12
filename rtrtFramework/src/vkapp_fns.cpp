@@ -101,6 +101,7 @@ void VkApp::createInstance(bool doApiDump)
     // To destroy: vkDestroyInstance(m_instance, nullptr);
 }
 
+//Should maybe be renamed to choosePhysicalDevice() ?
 void VkApp::createPhysicalDevice()
 {
     std::vector<vk::PhysicalDevice> physicalDevices = m_instance.enumeratePhysicalDevices();
@@ -183,19 +184,54 @@ void VkApp::createPhysicalDevice()
         //    tell me all about your system if more than one was found.
     }
     std::cout << "No suitable Physical Device found"<<std::endl;
-    assert(false);
+    throw 1;
 }
 
 void VkApp::chooseQueueIndex()
 {
-    VkQueueFlags requiredQueueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT
-                                      | VK_QUEUE_TRANSFER_BIT;
-    
-    uint32_t mpCount;
-    vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &mpCount, nullptr);
-    std::vector<VkQueueFamilyProperties> queueProperties(mpCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &mpCount, queueProperties.data());
+    vk::QueueFlags requiredQueueFlags = vk::QueueFlagBits::eGraphics | 
+                                        vk::QueueFlagBits::eCompute | 
+                                        vk::QueueFlagBits::eTransfer;
 
+    m_graphicsQueueIndex = -1;
+    // need to explicitly specify all the template arguments for getQueueFamilyProperties2 to make the compiler happy
+    using Chain = vk::StructureChain<vk::QueueFamilyProperties2, 
+                                     vk::QueueFamilyCheckpointPropertiesNV>;
+    auto queueFamilyProperties2 = 
+        m_physicalDevice.getQueueFamilyProperties2<>();
+
+    
+    for (size_t j = 0; j < queueFamilyProperties2.size(); j++)
+    {
+        std::cout << "\t"
+            << "QueueFamily " << j << "\n";
+        vk::QueueFamilyProperties const& properties = queueFamilyProperties2[j].queueFamilyProperties;
+        std::cout << "\t\t"
+            << "QueueFamilyProperties:\n";
+        std::cout << "\t\t\t"
+            << "queueFlags                  = " << vk::to_string(properties.queueFlags) << "\n";
+        std::cout << "\t\t\t"
+            << "queueCount                  = " << properties.queueCount << "\n";
+        std::cout << "\t\t\t"
+            << "timestampValidBits          = " << properties.timestampValidBits << "\n";
+        std::cout << "\t\t\t"
+            << "minImageTransferGranularity = " << properties.minImageTransferGranularity.width << " x " << properties.minImageTransferGranularity.height
+            << " x " << properties.minImageTransferGranularity.depth << "\n";
+        std::cout << "\n";
+
+        if (m_graphicsQueueIndex == -1) {
+            if (properties.queueFlags & requiredQueueFlags)
+                m_graphicsQueueIndex = j;
+        }
+    }
+
+    if (m_graphicsQueueIndex == -1) {
+        std::cout << "Unable to find a queue with the required flags" << std::endl;
+        throw 1;
+    }
+    else {
+        std::cout << "Choosing Queue index: " << m_graphicsQueueIndex << std::endl;
+    }
     // @@ Use the api_dump to document the results of the above two
     // step.  How many queue families does your Vulkan offer.  Which
     // of them, by index, has the above three required flags?
