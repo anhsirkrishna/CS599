@@ -5,3 +5,5 @@ Release
 Debug
 .vs
 .zip
+~*
+*.docx

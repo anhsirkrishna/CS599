@@ -103,30 +103,64 @@ void VkApp::createInstance(bool doApiDump)
 
 void VkApp::createPhysicalDevice()
 {
-    uint physicalDevicesCount;
-    vkEnumeratePhysicalDevices(m_instance, &physicalDevicesCount, nullptr);
-    std::vector<VkPhysicalDevice> physicalDevices(physicalDevicesCount);
-    vkEnumeratePhysicalDevices(m_instance, &physicalDevicesCount, physicalDevices.data());
-
+    std::vector<vk::PhysicalDevice> physicalDevices = m_instance.enumeratePhysicalDevices();
     std::vector<uint32_t> compatibleDevices;
   
-    printf("%d devices\n", physicalDevicesCount);
-    int i = 0;
+    printf("%d devices\n", physicalDevices.size());
+    vk::PhysicalDeviceProperties GPUproperties;
+    std::vector<vk::ExtensionProperties> extensionProperties;
+    unsigned int extensionCount;
 
     // For each GPU:
-    for (auto physicalDevice : physicalDevices) {
+    for (size_t i = 0; i < physicalDevices.size(); i++) {
 
         // Get the GPU's properties
-        VkPhysicalDeviceProperties GPUproperties;
-        vkGetPhysicalDeviceProperties(physicalDevice, &GPUproperties);
+        auto GPUproperties2 =
+            physicalDevices[i].getProperties2<
+            vk::PhysicalDeviceProperties2,
+            vk::PhysicalDeviceBlendOperationAdvancedPropertiesEXT>();
+        GPUproperties = GPUproperties2.get<vk::PhysicalDeviceProperties2>().properties;
+        if (GPUproperties.deviceType != vk::PhysicalDeviceType::eDiscreteGpu) {
+            std::cout << "Physical Device : " << GPUproperties.deviceName << 
+                " Does not satisfy DISCRETE_GPU property" << std::endl;
+            continue;
+        }
+
+        std::cout << "Physical Device : " << GPUproperties.deviceName <<
+            " Satisfies DISCRETE_GPU property" << std::endl;
 
         // Get the GPU's extension list;  Another two-step list retrieval procedure:
-        uint extCount;
-        vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extCount, nullptr);
-        std::vector<VkExtensionProperties> extensionProperties(extCount);
-        vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr,
-                                             &extCount, extensionProperties.data());
+        extensionProperties =
+            physicalDevices[i].enumerateDeviceExtensionProperties();
+        std::sort(extensionProperties.begin(),
+            extensionProperties.end(),
+            [](vk::ExtensionProperties const& a, vk::ExtensionProperties const& b) { return strcmp(a.extensionName, b.extensionName) < 0; });
+        
+        std::cout << "PhysicalDevice " << GPUproperties.deviceName << " : " << 
+            extensionProperties.size() << " extensions:\n";
+        for (auto const& ep : extensionProperties)
+        {
+            std::cout << "\t" << ep.extensionName << ":" << std::endl;
+            std::cout << "\t\tVersion: " << ep.specVersion << std::endl;
+            std::cout << std::endl;
+        }
 
+        extensionCount = 0;
+        for (auto const& extensionProperty : extensionProperties) {
+            for (auto const &reqExtension : reqDeviceExtensions) {
+                if (strcmp(extensionProperty.extensionName, reqExtension) == 0) {
+                    extensionCount++;
+                    if (extensionCount == reqDeviceExtensions.size()) {
+                        m_physicalDevice = physicalDevices[i];
+                        return;
+                    }
+                    break;
+                }
+            }
+        }
+
+        std::cout << "Physical Device : " << GPUproperties.deviceName <<
+            " Does not satisfy required extensions" << std::endl;
         // @@ This code is in a loop iterating variable physicalDevice
         // through a list of all physicalDevices.  The
         // physicalDevice's properties (GPUproperties) and a list of
@@ -148,7 +182,8 @@ void VkApp::createPhysicalDevice()
         //    raise an exception of none were found
         //    tell me all about your system if more than one was found.
     }
-  
+    std::cout << "No suitable Physical Device found"<<std::endl;
+    assert(false);
 }
 
 void VkApp::chooseQueueIndex()

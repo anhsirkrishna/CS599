@@ -90,7 +90,7 @@ public:
     vk::Instance m_instance;
     void createInstance(bool doApiDump);
 
-    VkPhysicalDevice m_physicalDevice{};
+    vk::PhysicalDevice m_physicalDevice;
     void createPhysicalDevice();
 
     uint32_t m_graphicsQueueIndex{VK_QUEUE_FAMILY_IGNORED};

@@ -30,7 +30,7 @@ VkApp::VkApp(App* _app) : app(_app)
 {
     createInstance(app->doApiDump);
     assert (m_instance);
-    //createPhysicalDevice(); // i.e. the GPU
+    createPhysicalDevice(); // i.e. the GPU
     // chooseQueueIndex();
     // createDevice();
     // getCommandQueue();
