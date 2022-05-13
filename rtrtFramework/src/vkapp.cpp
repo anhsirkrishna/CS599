@@ -33,11 +33,11 @@ VkApp::VkApp(App* _app) : app(_app)
     createPhysicalDevice(); // i.e. the GPU
     chooseQueueIndex();
     createDevice();
-    // getCommandQueue();
+    getCommandQueue();
 
-    // loadExtensions();
+    loadExtensions();
 
-    // getSurface();
+    getSurface();
     // createCommandPool();
     
     // createSwapchain();
@@ -153,41 +153,42 @@ VkPipelineStageFlags pipelineStageForLayout(VkImageLayout layout)
 void VkApp::postProcess()
 {
     std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color        = {{1,1,1,1}};
-    clearValues[1].depthStencil = {1.0f, 0};
-            
-    VkRenderPassBeginInfo _i{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+    clearValues[0].color = { {1,1,1,1} };
+    clearValues[1].depthStencil = { 1.0f, 0 };
+
+    VkRenderPassBeginInfo _i{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
     _i.clearValueCount = 2;
-    _i.pClearValues    = clearValues.data();
-    _i.renderPass      = m_postRenderPass;
-    _i.framebuffer     = m_framebuffers[m_swapchainIndex];
-    _i.renderArea      = {{0, 0}, windowSize};
+    _i.pClearValues = clearValues.data();
+    _i.renderPass = m_postRenderPass;
+    _i.framebuffer = m_framebuffers[m_swapchainIndex];
+    _i.renderArea = { {0, 0}, windowSize };
+
     vkCmdBeginRenderPass(m_commandBuffer, &_i, VK_SUBPASS_CONTENTS_INLINE);
     {   // extra indent for renderpass commands
-        VkViewport viewport{0.0f, 0.0f,
-            static_cast<float>(windowSize.width), static_cast<float>(windowSize.height),
-            0.0f, 1.0f};
-        vkCmdSetViewport(m_commandBuffer, 0, 1, &viewport);
-        
-        VkRect2D scissor{{0, 0}, {windowSize.width, windowSize.height}};
-        vkCmdSetScissor(m_commandBuffer, 0, 1, &scissor);
+        //VkViewport viewport{0.0f, 0.0f,
+        //    static_cast<float>(windowSize.width), static_cast<float>(windowSize.height),
+        //    0.0f, 1.0f};
+        //vkCmdSetViewport(m_commandBuffer, 0, 1, &viewport);
+        //
+        //VkRect2D scissor{{0, 0}, {windowSize.width, windowSize.height}};
+        //vkCmdSetScissor(m_commandBuffer, 0, 1, &scissor);
 
         auto aspectRatio = static_cast<float>(windowSize.width)
             / static_cast<float>(windowSize.height);
-        vkCmdPushConstants(m_commandBuffer, m_postPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                           sizeof(float), &aspectRatio);
+        //vkCmdPushConstants(m_commandBuffer, m_postPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+        //                   sizeof(float), &aspectRatio);
         vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_postPipeline);
-        vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                m_postPipelineLayout, 0, 0, nullptr, 0, nullptr);
+        //vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+        //                       m_postPipelineLayout, 0, 0, nullptr, 0, nullptr);
 
         // Weird! This draws 3 vertices but with no vertices/triangles buffers bound in.
         // Hint: The vertex shader fabricates vertices from gl_VertexIndex
         vkCmdDraw(m_commandBuffer, 3, 1, 0, 0);
 
-        #ifdef GUI
+#ifdef GUI
         ImGui::Render();  // Rendering UI
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), m_commandBuffer);
-        #endif
+#endif
     }
     vkCmdEndRenderPass(m_commandBuffer);
 }

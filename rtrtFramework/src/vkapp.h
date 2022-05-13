@@ -99,12 +99,12 @@ public:
     vk::Device m_device;
     void createDevice();
 
-    VkQueue m_queue{};
+    vk::Queue m_queue;
     void getCommandQueue();
     
     void loadExtensions();
-    
-    VkSurfaceKHR m_surface{};
+
+    vk::SurfaceKHR m_surface;
     void getSurface();
     
     VkCommandPool    m_cmdPool{VK_NULL_HANDLE};
