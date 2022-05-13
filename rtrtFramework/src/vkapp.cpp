@@ -38,7 +38,7 @@ VkApp::VkApp(App* _app) : app(_app)
     loadExtensions();
 
     getSurface();
-    // createCommandPool();
+    createCommandPool();
     
     // createSwapchain();
     // createDepthResource();
@@ -252,7 +252,8 @@ void VkApp::submitFrame()
     _si_.signalSemaphoreCount = 1;
     _si_.pSignalSemaphores    = &m_writtenSemaphore; // signaled when execution finishes
     _si_.commandBufferCount = 1;
-    _si_.pCommandBuffers = &m_commandBuffer;
+    VkCommandBuffer temp_buffer = m_commandBuffer;
+    _si_.pCommandBuffers = &temp_buffer;
     if (vkQueueSubmit(m_queue, 1, &_si_, m_waitFence) != VK_SUCCESS) {
         throw std::runtime_error("failed to submit draw command buffer!"); }
     

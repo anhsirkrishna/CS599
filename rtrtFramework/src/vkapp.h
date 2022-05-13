@@ -107,7 +107,8 @@ public:
     vk::SurfaceKHR m_surface;
     void getSurface();
     
-    VkCommandPool    m_cmdPool{VK_NULL_HANDLE};
+    vk::CommandPool m_cmdPool;
+    vk::CommandBuffer m_commandBuffer;
     void createCommandPool();
 
     VkSwapchainKHR m_swapchain{VK_NULL_HANDLE};
@@ -115,7 +116,7 @@ public:
     std::vector<VkImage>     m_swapchainImages{};  // from vkGetSwapchainImagesKHR
     std::vector<VkImageView> m_imageViews{};
     std::vector<VkImageMemoryBarrier> m_barriers{};  // Filled in  VkImageMemoryBarrier objects
-    VkCommandBuffer m_commandBuffer{};
+
     VkFence m_waitFence{}; 
     VkSemaphore m_readSemaphore{};
     VkSemaphore m_writtenSemaphore{};

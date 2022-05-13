@@ -20,6 +20,12 @@ void VkApp::destroyAllVulkanResources()
     // ...  All objects created on m_device must be destroyed before m_device.
     //vkDestroyDevice(m_device, nullptr);
     //vkDestroyInstance(m_instance, nullptr);
+
+    // freeing the commandBuffer is optional, 
+    // as it will automatically freed when the corresponding CommandPool is
+    // destroyed.
+    m_device.freeCommandBuffers(m_cmdPool, m_commandBuffer);
+    m_device.destroyCommandPool(m_cmdPool);
     m_instance.destroySurfaceKHR(m_surface);
     m_device.destroy();
     m_instance.destroy();
@@ -356,19 +362,16 @@ void VkApp::getSurface()
 // Use the command pool to also create a command buffer.
 void VkApp::createCommandPool()
 {
-    VkCommandPoolCreateInfo poolCreateInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-    poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    poolCreateInfo.queueFamilyIndex = m_graphicsQueueIndex;
-    vkCreateCommandPool(m_device, &poolCreateInfo, nullptr, &m_cmdPool);
+    m_cmdPool = m_device.createCommandPool(
+                 vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, 
+                                            m_graphicsQueueIndex));
     // @@ Verify VK_SUCCESS
     // To destroy: vkDestroyCommandPool(m_device, m_cmdPool, nullptr);
 
     // Create a command buffer
-    VkCommandBufferAllocateInfo allocateInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-    allocateInfo.commandPool = m_cmdPool;
-    allocateInfo.commandBufferCount = 1;
-    allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    vkAllocateCommandBuffers(m_device, &allocateInfo, &m_commandBuffer);
+    m_commandBuffer = m_device.allocateCommandBuffers(
+            vk::CommandBufferAllocateInfo(m_cmdPool, vk::CommandBufferLevel::ePrimary, 1)).front();
+
     // @@ Verify VK_SUCCESS
     // Nothing to destroy -- the pool owns the command buffer.
 }
