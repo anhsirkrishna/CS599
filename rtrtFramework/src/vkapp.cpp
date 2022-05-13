@@ -32,7 +32,7 @@ VkApp::VkApp(App* _app) : app(_app)
     assert (m_instance);
     createPhysicalDevice(); // i.e. the GPU
     chooseQueueIndex();
-    // createDevice();
+    createDevice();
     // getCommandQueue();
 
     // loadExtensions();

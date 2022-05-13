@@ -96,7 +96,7 @@ public:
     uint32_t m_graphicsQueueIndex{VK_QUEUE_FAMILY_IGNORED};
     void chooseQueueIndex();
 
-    VkDevice m_device{};
+    vk::Device m_device;
     void createDevice();
 
     VkQueue m_queue{};

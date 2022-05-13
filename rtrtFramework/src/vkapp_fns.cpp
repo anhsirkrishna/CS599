@@ -20,7 +20,7 @@ void VkApp::destroyAllVulkanResources()
     // ...  All objects created on m_device must be destroyed before m_device.
     //vkDestroyDevice(m_device, nullptr);
     //vkDestroyInstance(m_instance, nullptr);
-    
+    m_device.destroy();
     m_instance.destroy();
 }
 
@@ -85,10 +85,11 @@ void VkApp::createInstance(bool doApiDump)
     }
 
     // initialize the vk::ApplicationInfo structure
-    vk::ApplicationInfo applicationInfo(appName.c_str(), 1, engineName.c_str(), 1, VK_API_VERSION_1_2);
+    vk::ApplicationInfo applicationInfo(appName.c_str(), 1, engineName.c_str(), 1, VK_API_VERSION_1_3);
 
     // initialize the vk::InstanceCreateInfo
-    vk::InstanceCreateInfo instanceCreateInfo({}, &applicationInfo, 
+    vk::InstanceCreateInfo instanceCreateInfo(
+        vk::InstanceCreateFlags(), &applicationInfo,
         reqInstanceLayers.size(), reqInstanceLayers.data(),
         reqInstanceExtensions.size(), reqInstanceExtensions.data());
 
@@ -252,50 +253,53 @@ void VkApp::createDevice()
 
     // Hint: Keep it simple; add a second parameter (the pNext pointer) to each
     // structure point up to the previous structure.
-    
-    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeature{
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR};
-    
-    VkPhysicalDeviceAccelerationStructureFeaturesKHR accelFeature{
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR};
-    
-    VkPhysicalDeviceVulkan13Features features13{
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
-    
-    VkPhysicalDeviceVulkan12Features features12{
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
-    
-    VkPhysicalDeviceVulkan11Features features11{
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES};
-    
-    VkPhysicalDeviceFeatures2 features2{
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+    vk::PhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeature;
 
+    vk::PhysicalDeviceAccelerationStructureFeaturesKHR accelFeature;
+    accelFeature.setPNext(&rtPipelineFeature);
+
+    vk::PhysicalDeviceVulkan13Features feature13;
+    feature13.setPNext(&accelFeature);
+
+    vk::PhysicalDeviceVulkan12Features feature12;
+    feature12.setPNext(&feature13);
+
+    vk::PhysicalDeviceVulkan11Features feature11;
+    feature11.setPNext(&feature12);
+    
+    vk::PhysicalDeviceFeatures2 feature2;
+    feature2.setPNext(&feature11);
+
+    m_physicalDevice.getFeatures2(&feature2);
     // Fill in all structures on the pNext chain
-    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &features2);
     // @@
     // Document the whole filled in pNext chain using an api_dump
     // Examine all the many features.  Do any of them look familiar?
 
     // Turn off robustBufferAccess (WHY?)
-    features2.features.robustBufferAccess = VK_FALSE;
+    // features2.features.robustBufferAccess = VK_FALSE;
+    // Default argument for feature2 already sets it to VK_FALSE 
+    // Hence commented out earlier line
 
-    float priority = 1.0;
-    VkDeviceQueueCreateInfo queueInfo{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
-    queueInfo.queueFamilyIndex = m_graphicsQueueIndex;
-    queueInfo.queueCount       = 1;
-    queueInfo.pQueuePriorities = &priority;
-    
-    VkDeviceCreateInfo deviceCreateInfo{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
-    deviceCreateInfo.pNext            = &features2; // This is the whole pNext chain
-  
-    deviceCreateInfo.queueCreateInfoCount = 1;
-    deviceCreateInfo.pQueueCreateInfos    = &queueInfo;
-    
-    deviceCreateInfo.enabledExtensionCount   = static_cast<uint32_t>(reqDeviceExtensions.size());
-    deviceCreateInfo.ppEnabledExtensionNames = reqDeviceExtensions.data();
+    float priority = 0.0f;
+    vk::DeviceQueueCreateInfo deviceQueueCreateInfo(vk::DeviceQueueCreateFlags(),
+        static_cast<uint32_t>(m_graphicsQueueIndex), 1, &priority);
 
-    vkCreateDevice(m_physicalDevice, &deviceCreateInfo, nullptr, &m_device);
+    vk::DeviceCreateInfo deviceCreateInfo;
+    deviceCreateInfo.setFlags(vk::DeviceCreateFlags());
+    
+    deviceCreateInfo.setQueueCreateInfoCount(1);
+    deviceCreateInfo.setQueueCreateInfos(deviceQueueCreateInfo);
+    
+    deviceCreateInfo.setEnabledLayerCount(reqInstanceLayers.size());
+    deviceCreateInfo.setPpEnabledLayerNames(reqInstanceLayers.data());
+
+    deviceCreateInfo.setEnabledExtensionCount(reqDeviceExtensions.size());
+    deviceCreateInfo.setPpEnabledExtensionNames(reqDeviceExtensions.data());
+
+    deviceCreateInfo.setPNext(&feature2);
+
+    m_device = m_physicalDevice.createDevice(deviceCreateInfo);
     // @@
     // Verify VK_SUCCESS
     // To destroy: vkDestroyDevice(m_device, nullptr);
