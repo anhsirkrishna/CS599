@@ -24,6 +24,16 @@ void VkApp::destroyAllVulkanResources()
     // freeing the commandBuffer is optional, 
     // as it will automatically freed when the corresponding CommandPool is
     // destroyed.
+    m_device.destroySemaphore(m_readSemaphore);
+    m_device.destroySemaphore(m_writtenSemaphore);
+    m_device.destroyFence(m_waitFence);
+
+    for (auto& imageView : m_imageViews)
+    {
+        m_device.destroyImageView(imageView);
+    }
+    m_device.destroySwapchainKHR(m_swapchain);
+
     m_device.freeCommandBuffers(m_cmdPool, m_commandBuffer);
     m_device.destroyCommandPool(m_cmdPool);
     m_instance.destroySurfaceKHR(m_surface);
@@ -191,8 +201,7 @@ void VkApp::createPhysicalDevice()
         //    raise an exception of none were found
         //    tell me all about your system if more than one was found.
     }
-    std::cout << "No suitable Physical Device found"<<std::endl;
-    throw 1;
+    throw std::runtime_error("No suitable Physical Device found");
 }
 
 void VkApp::chooseQueueIndex()
@@ -234,8 +243,7 @@ void VkApp::chooseQueueIndex()
     }
 
     if (m_graphicsQueueIndex == -1) {
-        std::cout << "Unable to find a queue with the required flags" << std::endl;
-        throw 1;
+        throw std::runtime_error("Unable to find a queue with the required flags");
     }
     else {
         std::cout << "Choosing Queue index: " << m_graphicsQueueIndex << std::endl;
@@ -337,19 +345,18 @@ void VkApp::loadExtensions()
 //  manages the window, it creates the VkSurface at our request.
 void VkApp::getSurface()
 {
-    VkSurfaceKHR temp_surface;
-    VkResult res = glfwCreateWindowSurface(m_instance, app->GLFW_window, nullptr, &temp_surface);
+    VkSurfaceKHR _surface;
+    VkResult res = glfwCreateWindowSurface(m_instance, app->GLFW_window, nullptr, &_surface);
     if (res == VK_SUCCESS)
-        m_surface = temp_surface;
+        m_surface = vk::SurfaceKHR( _surface );
     else {
-        std::cout << "Unable to create a Surface using GLFW" << std::endl;
-        throw 1;
+        throw std::runtime_error("Unable to create a Surface using GLFW");
     }
 
     if (m_physicalDevice.getSurfaceSupportKHR(m_graphicsQueueIndex, m_surface) == VK_TRUE)
         return;
 
-    throw 1;
+    throw std::runtime_error("Could not create a supported surface");
     // @@ Verify VK_SUCCESS from both the glfw... and the vk... calls.
     // @@ Verify isSupported==VK_TRUE, meaning that Vulkan supports presenting on this surface.
     //To destroy: vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
@@ -374,19 +381,46 @@ void VkApp::createCommandPool()
 
     // @@ Verify VK_SUCCESS
     // Nothing to destroy -- the pool owns the command buffer.
+    // Freeing the allocated command buffer is optional
 }
 
 // 
 void VkApp::createSwapchain()
 {
-    VkResult       err;
-    VkSwapchainKHR oldSwapchain = m_swapchain;
+    vk::SwapchainKHR oldSwapchain = m_swapchain;
 
-    vkDeviceWaitIdle(m_device);  // Probably unnecessary
+    m_device.waitIdle();
 
     // Get the surface's capabilities
-    VkSurfaceCapabilitiesKHR capabilities;
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, m_surface, &capabilities);
+    vk::SurfaceCapabilitiesKHR surfaceCapabilities = 
+        m_physicalDevice.getSurfaceCapabilitiesKHR(m_surface);
+
+    vk::Extent2D               swapchainExtent;
+    if (surfaceCapabilities.currentExtent.width == std::numeric_limits<uint32_t>::max())
+    {
+        // Does this case ever happen?
+        int width, height;
+        glfwGetFramebufferSize(app->GLFW_window, &width, &height);
+
+        swapchainExtent.width = std::clamp(swapchainExtent.width,
+            surfaceCapabilities.minImageExtent.width,
+            surfaceCapabilities.maxImageExtent.width);
+
+        swapchainExtent.height = std::clamp(swapchainExtent.height,
+            surfaceCapabilities.minImageExtent.height,
+            surfaceCapabilities.maxImageExtent.height);
+    }
+    else
+    {
+        // If the surface size is defined, the swap chain size must match
+        swapchainExtent = surfaceCapabilities.currentExtent;
+    }
+    
+    // Test against valid size, typically hit when windows are minimized.
+    // The app must prevent triggering this code in such a case
+    assert(swapchainExtent.width && swapchainExtent.height);
+    // @@ If this assert fires, we have some work to do to better deal
+    // with the situation.
 
     // @@  Roll your own two step process to retrieve a list of present mode into
     //    std::vector<VkPresentModeKHR> presentModes;
@@ -398,9 +432,23 @@ void VkApp::createSwapchain()
     // your system offers VK_PRESENT_MODE_MAILBOX_KHR mode.  My
     // high-end windows desktop does; My higher-end Linux laptop
     // doesn't.
+    std::vector<vk::PresentModeKHR> present_modes = 
+        m_physicalDevice.getSurfacePresentModesKHR(m_surface);
 
     // Choose VK_PRESENT_MODE_FIFO_KHR as a default (this must be supported)
-    VkPresentModeKHR swapchainPresentMode = VK_PRESENT_MODE_FIFO_KHR; // Support is required.
+    vk::PresentModeKHR swapchainPresentMode = vk::PresentModeKHR::eFifo;
+
+    auto present_mode_iter = std::find_if(present_modes.begin(), present_modes.end(),
+        [](vk::PresentModeKHR const& _present_mode) { return _present_mode == vk::PresentModeKHR::eMailbox; });
+
+    if (present_mode_iter != present_modes.end()) {
+        swapchainPresentMode = *present_mode_iter;
+        std::cout << "Mailbox Mode found as a present mode" << std::endl;
+    }
+    else
+        std::cout << "Mailbox Mode NOT found as a present mode" << std::endl;
+        
+
     // @@ But choose VK_PRESENT_MODE_MAILBOX_KHR if it can be found in
     // the retrieved presentModes Several Vulkan tutorials opine that
     // MODE_MAILBOX is the premier mode, but this may not be best for
@@ -414,8 +462,22 @@ void VkApp::createSwapchain()
     //   vkGetPhysicalDeviceSurfaceFormatsKHR(m_physicalDevice, m_surface, ...);
     // @@ Document the list you get.
 
-    VkFormat surfaceFormat = VK_FORMAT_UNDEFINED;               // Temporary value.
-    VkColorSpaceKHR surfaceColor = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR; // Temporary value
+    std::vector<vk::SurfaceFormatKHR> formats = 
+        m_physicalDevice.getSurfaceFormatsKHR(m_surface);
+    assert(!formats.empty());
+
+    auto format_iter = std::find_if(formats.begin(), formats.end(), 
+        [](vk::SurfaceFormatKHR const& _format) { return _format.format == vk::Format::eB8G8R8A8Unorm; });
+
+    vk::Format format;
+    vk::ColorSpaceKHR colorSpace;
+    if (format_iter != formats.end()) {
+        format = (*format_iter).format;
+        colorSpace = (*format_iter).colorSpace;
+    }
+    else
+        throw std::runtime_error("Unable to find required Format");
+
     // @@ Replace the above two temporary lines with the following two
     // to choose the first format and its color space as defaults:
     //  VkFormat surfaceFormat = formats[0].format;
@@ -426,37 +488,11 @@ void VkApp::createSwapchain()
     // exists.  Document your list of formats/color-spaces, and your
     // particular choice.
 
-    // Get the swap chain extent
-    VkExtent2D swapchainExtent = capabilities.currentExtent;
-    if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
-        swapchainExtent = capabilities.currentExtent;
-    }
-    else {
-        // Does this case ever happen?
-        int width, height;
-        glfwGetFramebufferSize(app->GLFW_window, &width, &height);
-
-        swapchainExtent = VkExtent2D{ static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
-
-        swapchainExtent.width = std::clamp(swapchainExtent.width,
-            capabilities.minImageExtent.width,
-            capabilities.maxImageExtent.width);
-        swapchainExtent.height = std::clamp(swapchainExtent.height,
-            capabilities.minImageExtent.height,
-            capabilities.maxImageExtent.height);
-    }
-
-    // Test against valid size, typically hit when windows are minimized.
-    // The app must prevent triggering this code in such a case
-    assert(swapchainExtent.width && swapchainExtent.height);
-    // @@ If this assert fires, we have some work to do to better deal
-    // with the situation.
-
     // Choose the number of swap chain images, within the bounds supported.
-    uint imageCount = capabilities.minImageCount + 1; // Recommendation: minImageCount+1
-    if (capabilities.maxImageCount > 0
-        && imageCount > capabilities.maxImageCount) {
-        imageCount = capabilities.maxImageCount;
+    uint imageCount = surfaceCapabilities.minImageCount + 1; // Recommendation: minImageCount+1
+    if (surfaceCapabilities.maxImageCount > 0
+        && imageCount > surfaceCapabilities.maxImageCount) {
+        imageCount = surfaceCapabilities.maxImageCount;
     }
 
     assert(imageCount == 3);
@@ -464,28 +500,27 @@ void VkApp::createSwapchain()
     // the situation that caused it.  
 
     // Create the swap chain
-    VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
-        | VK_IMAGE_USAGE_STORAGE_BIT
-        | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-
-    VkSwapchainCreateInfoKHR _i = { VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR };
-    _i.surface = m_surface;
-    _i.minImageCount = imageCount;
-    _i.imageFormat = surfaceFormat;
-    _i.imageColorSpace = surfaceColor;
-    _i.imageExtent = swapchainExtent;
-    _i.imageUsage = imageUsage;
-    _i.preTransform = capabilities.currentTransform;
-    _i.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    _i.imageArrayLayers = 1;
-    _i.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    _i.queueFamilyIndexCount = 1;
-    _i.pQueueFamilyIndices = &m_graphicsQueueIndex;
-    _i.presentMode = swapchainPresentMode;
-    _i.oldSwapchain = oldSwapchain;
-    _i.clipped = true;
-
-    vkCreateSwapchainKHR(m_device, &_i, nullptr, &m_swapchain);
+    vk::ImageUsageFlags imageUsage = vk::ImageUsageFlagBits::eColorAttachment | 
+                                     vk::ImageUsageFlagBits::eStorage | 
+                                     vk::ImageUsageFlagBits::eTransferDst;
+    vk::SwapchainCreateInfoKHR swapChainCreateInfo(
+        vk::SwapchainCreateFlagsKHR(),
+        m_surface,
+        imageCount,
+        format,
+        colorSpace,
+        swapchainExtent,
+        1,
+        imageUsage,
+        vk::SharingMode::eExclusive,
+        {},
+        surfaceCapabilities.currentTransform,
+        vk::CompositeAlphaFlagBitsKHR::eOpaque,
+        swapchainPresentMode,
+        true,
+        nullptr);
+    
+    m_swapchain = m_device.createSwapchainKHR(swapChainCreateInfo);
     // @@ Verify VK_SUCCESS
 
     //@@ Do the two step process to retrieve the list of (3) swapchain images
@@ -494,69 +529,57 @@ void VkApp::createSwapchain()
     //   vkGetSwapchainImagesKHR(m_device, m_swapchain, ...);
     // Verify success
     // Verify and document that you retrieved the correct number of images.
+    m_swapchainImages = m_device.getSwapchainImagesKHR(m_swapchain);
+    std::cout << "Image count is : " << imageCount << std::endl;
+    std::cout << "Swapchain size is : " << m_swapchainImages.size() << std::endl;
+    m_imageCount = imageCount;
 
-    m_barriers.resize(m_imageCount);
-    m_imageViews.resize(m_imageCount);
+    m_barriers.reserve(m_imageCount);
+    m_imageViews.reserve(m_imageCount);
 
     // Create an VkImageView for each swap chain image.
-    for (uint i = 0; i < m_imageCount; i++) {
-        VkImageViewCreateInfo createInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-        createInfo.image = m_swapchainImages[i];
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        createInfo.format = surfaceFormat;
-        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        createInfo.subresourceRange.baseMipLevel = 0;
-        createInfo.subresourceRange.levelCount = 1;
-        createInfo.subresourceRange.baseArrayLayer = 0;
-        createInfo.subresourceRange.layerCount = 1;
 
-        vkCreateImageView(m_device, &createInfo, nullptr, &m_imageViews[i]);
+    vk::ImageViewCreateInfo imageViewCreateInfo({}, {}, 
+        vk::ImageViewType::e2D, 
+        format, {},
+        { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 });
+    for (auto image : m_swapchainImages)
+    {
+        imageViewCreateInfo.image = image;
+        m_imageViews.push_back(m_device.createImageView(imageViewCreateInfo));
     }
 
     // Create three VkImageMemoryBarrier structures (one for each swap
     // chain image) and specify the desired
     // layout (VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) for each.
-    for (uint i = 0; i < m_imageCount; i++) {
-        VkImageSubresourceRange range = { 0 };
-        range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        range.baseMipLevel = 0;
-        range.levelCount = VK_REMAINING_MIP_LEVELS;
-        range.baseArrayLayer = 0;
-        range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    vk::ImageSubresourceRange res_range(vk::ImageAspectFlagBits::eColor, 0,
+        VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS);
 
-        VkImageMemoryBarrier memBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-        memBarrier.dstAccessMask = 0;
-        memBarrier.srcAccessMask = 0;
-        memBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        memBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-        memBarrier.image = m_swapchainImages[i];
-        memBarrier.subresourceRange = range;
-        m_barriers[i] = memBarrier;
+    for (auto image : m_swapchainImages) {
+        vk::ImageMemoryBarrier mem_barrier({}, {},
+            vk::ImageLayout::eUndefined, vk::ImageLayout::ePresentSrcKHR,
+            {}, {}, image, res_range);
+        m_barriers.push_back(mem_barrier);
     }
 
     // Create a temporary command buffer. submit the layout conversion
     // command, submit and destroy the command buffer.
-    VkCommandBuffer cmd = createTempCmdBuffer();
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr, 0,
-        nullptr, m_imageCount, m_barriers.data());
-    submitTempCmdBuffer(cmd);
+    //VkCommandBuffer cmd = createTempCmdBuffer();
+    vk::CommandBuffer cmd = createTempCppCmdBuffer();
+    cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTopOfPipe, 
+        vk::DependencyFlagBits::eByRegion, 0, nullptr, 0, nullptr, m_imageCount, m_barriers.data());
+
+    submitTemptCppCmdBuffer(cmd);
 
     // Create the three synchronization objects.  These are not
     // technically part of the swap chain, but they are used
     // exclusively for synchronizing the swap chain, so I include them
     // here.
-    VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-    fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    vkCreateFence(m_device, &fenceCreateInfo, nullptr, &m_waitFence);
+    m_waitFence = m_device.createFence(
+            vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
 
-    VkSemaphoreCreateInfo semCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-    vkCreateSemaphore(m_device, &semCreateInfo, nullptr, &m_readSemaphore);
-    vkCreateSemaphore(m_device, &semCreateInfo, nullptr, &m_writtenSemaphore);
+    m_readSemaphore = m_device.createSemaphore(vk::SemaphoreCreateInfo());
+    m_writtenSemaphore = m_device.createSemaphore(vk::SemaphoreCreateInfo());
     //NAME(m_readSemaphore, VK_OBJECT_TYPE_SEMAPHORE, "m_readSemaphore");
     //NAME(m_writtenSemaphore, VK_OBJECT_TYPE_SEMAPHORE, "m_writtenSemaphore");
     //NAME(m_queue, VK_OBJECT_TYPE_QUEUE, "m_queue");

@@ -40,7 +40,7 @@ VkApp::VkApp(App* _app) : app(_app)
     getSurface();
     createCommandPool();
     
-    // createSwapchain();
+    createSwapchain();
     // createDepthResource();
     // createPostRenderPass();
     // createPostFrameBuffers();
@@ -161,7 +161,7 @@ void VkApp::postProcess()
     _i.pClearValues = clearValues.data();
     _i.renderPass = m_postRenderPass;
     _i.framebuffer = m_framebuffers[m_swapchainIndex];
-    _i.renderArea = { {0, 0}, windowSize };
+    _i.renderArea = { {0, 0}, VkExtent2D(windowSize) };
 
     vkCmdBeginRenderPass(m_commandBuffer, &_i, VK_SUBPASS_CONTENTS_INLINE);
     {   // extra indent for renderpass commands
@@ -209,6 +209,15 @@ VkCommandBuffer VkApp::createTempCmdBuffer()
     return cmdBuffer;
 }
 
+vk::CommandBuffer VkApp::createTempCppCmdBuffer() {
+    vk::CommandBuffer cmdBuffer = m_device.allocateCommandBuffers(
+            vk::CommandBufferAllocateInfo(m_cmdPool, vk::CommandBufferLevel::ePrimary, 1)).front();
+    vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+    cmdBuffer.begin(beginInfo);
+
+    return cmdBuffer;
+}
+
 void VkApp::submitTempCmdBuffer(VkCommandBuffer cmdBuffer)
 {
     vkEndCommandBuffer(cmdBuffer);
@@ -221,6 +230,17 @@ void VkApp::submitTempCmdBuffer(VkCommandBuffer cmdBuffer)
     vkFreeCommandBuffers(m_device, m_cmdPool, 1, &cmdBuffer);
 }
 
+void VkApp::submitTemptCppCmdBuffer(vk::CommandBuffer cmdBuffer) {
+    cmdBuffer.end();
+
+    vk::SubmitInfo submitInfo;
+    submitInfo.setCommandBufferCount(1);
+    submitInfo.setPCommandBuffers(&cmdBuffer);
+    m_queue.submit(1, &submitInfo, {});
+    m_queue.waitIdle();
+    m_device.freeCommandBuffers(m_cmdPool, 1, &cmdBuffer);
+}
+
 void VkApp::prepareFrame()
 {
     // Acquire the next image from the swap chain --> m_swapchainIndex
@@ -229,43 +249,29 @@ void VkApp::prepareFrame()
 
     // Check if window has been resized -- or other(??) swapchain specific event
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        recreateSizedResources(windowSize); }
+        recreateSizedResources(VkExtent2D(windowSize)); }
 
     // Use a fence to wait until the command buffer has finished execution before using it again
-    while (VK_TIMEOUT == vkWaitForFences(m_device, 1, &m_waitFence, VK_TRUE, 1'000'000))
+    while (vk::Result::eTimeout == m_device.waitForFences(1, &m_waitFence, VK_TRUE, 1'000'000))
         {}
 }
 
 void VkApp::submitFrame()
 {
-    vkResetFences(m_device, 1, &m_waitFence);
+    m_device.resetFences(1, &m_waitFence);
 
     // Pipeline stage at which the queue submission will wait (via pWaitSemaphores)
-    const VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-     
+    const vk::PipelineStageFlags waitStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
     // The submit info structure specifies a command buffer queue submission batch
-    VkSubmitInfo _si_{VK_STRUCTURE_TYPE_SUBMIT_INFO};
-    _si_.pNext             = nullptr;
-    _si_.pWaitDstStageMask = &waitStageMask; //  pipeline stages to wait for
-    _si_.waitSemaphoreCount   = 1;  
-    _si_.pWaitSemaphores = &m_readSemaphore;  // waited upon before execution
-    _si_.signalSemaphoreCount = 1;
-    _si_.pSignalSemaphores    = &m_writtenSemaphore; // signaled when execution finishes
-    _si_.commandBufferCount = 1;
-    VkCommandBuffer temp_buffer = m_commandBuffer;
-    _si_.pCommandBuffers = &temp_buffer;
-    if (vkQueueSubmit(m_queue, 1, &_si_, m_waitFence) != VK_SUCCESS) {
-        throw std::runtime_error("failed to submit draw command buffer!"); }
-    
-    // Present frame
-    VkPresentInfoKHR _i_{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
-    _i_.waitSemaphoreCount = 1;
-    _i_.pWaitSemaphores    = &m_writtenSemaphore;;
-    _i_.swapchainCount     = 1;
-    _i_.pSwapchains        = &m_swapchain;
-    _i_.pImageIndices      = &m_swapchainIndex;
-    if (vkQueuePresentKHR(m_queue, &_i_) != VK_SUCCESS) {
-        throw std::runtime_error("failed to present swap chain image!"); }
+    vk::SubmitInfo submitInfo(1, &m_readSemaphore, 
+        &waitStageMask,
+        1, &m_commandBuffer, 
+        1, &m_writtenSemaphore);
+    m_queue.submit(1, &submitInfo, m_waitFence);
+
+    vk::PresentInfoKHR presentInfo(1, &m_writtenSemaphore,
+        1, &m_swapchain, &m_swapchainIndex);
+    m_queue.presentKHR(presentInfo);
 }
 
 

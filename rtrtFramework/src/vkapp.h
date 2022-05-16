@@ -80,7 +80,9 @@ public:
     // Some auxiliary functions
     void recreateSizedResources(VkExtent2D size);
     VkCommandBuffer createTempCmdBuffer();
+    vk::CommandBuffer createTempCppCmdBuffer();
     void submitTempCmdBuffer(VkCommandBuffer cmdBuffer);
+    void submitTemptCppCmdBuffer(vk::CommandBuffer cmdBuffer);
     VkShaderModule createShaderModule(std::string code);
     VkPipelineShaderStageCreateInfo createShaderStageInfo(const std::string&    code,
                                                           VkShaderStageFlagBits stage,
@@ -111,16 +113,16 @@ public:
     vk::CommandBuffer m_commandBuffer;
     void createCommandPool();
 
-    VkSwapchainKHR m_swapchain{VK_NULL_HANDLE};
+    vk::SwapchainKHR m_swapchain;
     uint32_t       m_imageCount{0};
-    std::vector<VkImage>     m_swapchainImages{};  // from vkGetSwapchainImagesKHR
-    std::vector<VkImageView> m_imageViews{};
-    std::vector<VkImageMemoryBarrier> m_barriers{};  // Filled in  VkImageMemoryBarrier objects
-
-    VkFence m_waitFence{}; 
-    VkSemaphore m_readSemaphore{};
-    VkSemaphore m_writtenSemaphore{};
-    VkExtent2D windowSize{0, 0}; // Size of the window
+    std::vector<vk::Image>     m_swapchainImages;  // from vkGetSwapchainImagesKHR
+    std::vector<vk::ImageView> m_imageViews{};
+    std::vector<vk::ImageMemoryBarrier> m_barriers{};  // Filled in  VkImageMemoryBarrier objects
+ 
+    vk::Fence m_waitFence;
+    vk::Semaphore m_readSemaphore;
+    vk::Semaphore m_writtenSemaphore{};
+    vk::Extent2D windowSize{0, 0}; // Size of the window
     void createSwapchain();
     void destroySwapchain();
 
