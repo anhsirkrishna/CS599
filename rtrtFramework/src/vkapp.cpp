@@ -46,7 +46,7 @@ VkApp::VkApp(App* _app) : app(_app)
     createPostFrameBuffers();
 
     // createPostDescriptor();
-    // createPostPipeline();
+    createPostPipeline();
 
     // #ifdef GUI
     // initGUI();
@@ -275,18 +275,12 @@ void VkApp::submitFrame()
 }
 
 
-VkShaderModule VkApp::createShaderModule(std::string code)
+vk::ShaderModule VkApp::createShaderModule(std::string code)
 {
-    VkShaderModuleCreateInfo createInfo = {};
-    createInfo.sType                    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize                 = code.size();
-    createInfo.pCode                    = (uint32_t*) code.data();
+    vk::ShaderModuleCreateInfo sm_createInfo(vk::ShaderModuleCreateFlags(),
+        code.size(), (uint32_t*)code.data(), nullptr);
 
-    VkShaderModule shaderModule = VK_NULL_HANDLE;
-    if (vkCreateShaderModule(m_device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
-        assert(0 && "failed to create shader module!");
-
-    return shaderModule;
+    return m_device.createShaderModule(sm_createInfo);
 }
 
 VkPipelineShaderStageCreateInfo VkApp::createShaderStageInfo(const std::string&    code,

@@ -83,7 +83,7 @@ public:
     vk::CommandBuffer createTempCppCmdBuffer();
     void submitTempCmdBuffer(VkCommandBuffer cmdBuffer);
     void submitTemptCppCmdBuffer(vk::CommandBuffer cmdBuffer);
-    VkShaderModule createShaderModule(std::string code);
+    vk::ShaderModule createShaderModule(std::string code);
     VkPipelineShaderStageCreateInfo createShaderStageInfo(const std::string&    code,
                                                           VkShaderStageFlagBits stage,
                                                           const char* entryPoint = "main");
@@ -129,14 +129,14 @@ public:
     ImageWrap m_depthImage;
     void createDepthResource();
     
-    VkPipelineLayout m_postPipelineLayout{VK_NULL_HANDLE};
+    vk::PipelineLayout m_postPipelineLayout;
     vk::RenderPass m_postRenderPass;
     void createPostRenderPass();
     
     std::vector<VkFramebuffer> m_framebuffers{}; // One frambuffer per swapchain image.
     void createPostFrameBuffers();
 
-    VkPipeline m_postPipeline{VK_NULL_HANDLE};
+    vk::Pipeline m_postPipeline;
     void createPostPipeline();
     
     #ifdef GUI

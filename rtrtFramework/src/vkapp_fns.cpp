@@ -24,6 +24,9 @@ void VkApp::destroyAllVulkanResources()
     // freeing the commandBuffer is optional, 
     // as it will automatically freed when the corresponding CommandPool is
     // destroyed.
+    m_device.destroyPipeline(m_postPipeline);
+    m_device.destroyPipelineLayout(m_postPipelineLayout);
+
     for (auto& frameBuffer : m_framebuffers)
     {
         m_device.destroyFramebuffer(frameBuffer);
@@ -797,8 +800,7 @@ void VkApp::createPostPipeline()
 {
 
     // Creating the pipeline layout
-    VkPipelineLayoutCreateInfo createInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-
+    vk::PipelineLayoutCreateInfo createInfo;
     // What we eventually want:
     //createInfo.setLayoutCount         = 1;
     //createInfo.pSetLayouts            = &m_scDesc.descSetLayout;
@@ -808,133 +810,101 @@ void VkApp::createPostPipeline()
     //createInfo.pPushConstantRanges    = &pushConstantRanges;
 
     // What we can do now as a first pass:
-    createInfo.setLayoutCount = 0;
-    createInfo.pSetLayouts = nullptr;
-    createInfo.pushConstantRangeCount = 0;
-    createInfo.pPushConstantRanges = nullptr;
-
-    vkCreatePipelineLayout(m_device, &createInfo, nullptr, &m_postPipelineLayout);
+    m_postPipelineLayout = m_device.createPipelineLayout(createInfo);
 
     ////////////////////////////////////////////
     // Create the shaders
     ////////////////////////////////////////////
-    VkShaderModule vertShaderModule = createShaderModule(loadFile("spv/post.vert.spv"));
-    VkShaderModule fragShaderModule = createShaderModule(loadFile("spv/post.frag.spv"));
+    vk::ShaderModule vertShaderModule = createShaderModule(loadFile("spv/post.vert.spv"));
+    vk::ShaderModule fragShaderModule = createShaderModule(loadFile("spv/post.frag.spv"));
 
-    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
-    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    vertShaderStageInfo.module = vertShaderModule;
-    vertShaderStageInfo.pName = "main";
+    vk::PipelineShaderStageCreateInfo vertShaderStageInfo(
+        vk::PipelineShaderStageCreateFlags(), 
+        vk::ShaderStageFlagBits::eVertex, 
+        vertShaderModule, "main");
 
-    VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
-    fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    fragShaderStageInfo.module = fragShaderModule;
-    fragShaderStageInfo.pName = "main";
+    vk::PipelineShaderStageCreateInfo fragShaderStageInfo(
+        vk::PipelineShaderStageCreateFlags(),
+        vk::ShaderStageFlagBits::eFragment,
+        fragShaderModule, "main");
 
-    VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
-
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vk::PipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
 
     //auto bindingDescription = Vertex::getBindingDescription();
     //auto attributeDescriptions = Vertex::getAttributeDescriptions();
 
     // No geometry in this pipeline's draw.
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.pVertexBindingDescriptions = nullptr;
+    vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
 
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
-    vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+    vk::PipelineInputAssemblyStateCreateInfo inputAssembly({}, vk::PrimitiveTopology::eTriangleList);
 
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    inputAssembly.primitiveRestartEnable = VK_FALSE;
+    vk::Viewport viewport;
+    viewport.setWidth(windowSize.width);
+    viewport.setHeight(windowSize.height);
+    viewport.setMaxDepth(1.0f);
 
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = (float)windowSize.width;
-    viewport.height = (float)windowSize.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
+    vk::Rect2D scissor({ 0, 0 },
+        vk::Extent2D(windowSize.width, windowSize.height));
 
-    VkRect2D scissor{};
-    scissor.offset = { 0, 0 };
-    scissor.extent = VkExtent2D{ windowSize.width, windowSize.height };
+    vk::PipelineViewportStateCreateInfo viewportState({}, 1, &viewport, 1, &scissor);
 
-    VkPipelineViewportStateCreateInfo viewportState{};
-    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.viewportCount = 1;
-    viewportState.pViewports = &viewport;
-    viewportState.scissorCount = 1;
-    viewportState.pScissors = &scissor;
+    vk::PipelineRasterizationStateCreateInfo rasterizer;
+    rasterizer.setLineWidth(1.0f);
 
-    VkPipelineRasterizationStateCreateInfo rasterizer{};
-    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.depthClampEnable = VK_FALSE;
-    rasterizer.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_NONE; //??
-    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rasterizer.depthBiasEnable = VK_FALSE;
+    vk::PipelineMultisampleStateCreateInfo multiSampling;
 
-    VkPipelineMultisampleStateCreateInfo multisampling{};
-    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    vk::PipelineDepthStencilStateCreateInfo depthStencil;
+    depthStencil.setDepthTestEnable(VK_TRUE);
+    depthStencil.setDepthWriteEnable(VK_TRUE);
+    depthStencil.setDepthCompareOp(vk::CompareOp::eLessOrEqual);
 
-    VkPipelineDepthStencilStateCreateInfo depthStencil{};
-    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = VK_TRUE;
-    depthStencil.depthWriteEnable = VK_TRUE;
-    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;// BEWARE!!  NECESSARY!!
-    depthStencil.depthBoundsTestEnable = VK_FALSE;
-    depthStencil.stencilTestEnable = VK_FALSE;
+    vk::PipelineColorBlendAttachmentState colorBlendAttachment;
+    colorBlendAttachment.setColorWriteMask(vk::ColorComponentFlagBits::eR | 
+        vk::ColorComponentFlagBits::eG | 
+        vk::ColorComponentFlagBits::eB | 
+        vk::ColorComponentFlagBits::eA );
 
-    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_FALSE;
+    vk::PipelineColorBlendStateCreateInfo colorBlending({}, VK_FALSE,
+        vk::LogicOp::eCopy, 1, &colorBlendAttachment);
 
-    VkPipelineColorBlendStateCreateInfo colorBlending{};
-    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlending.logicOpEnable = VK_FALSE;
-    colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments = &colorBlendAttachment;
-    colorBlending.blendConstants[0] = 0.0f;
-    colorBlending.blendConstants[1] = 0.0f;
-    colorBlending.blendConstants[2] = 0.0f;
-    colorBlending.blendConstants[3] = 0.0f;
+    vk::GraphicsPipelineCreateInfo pipelineCreateInfo;
+    pipelineCreateInfo.setStageCount(2);
+    pipelineCreateInfo.setPStages(shaderStages);
+    pipelineCreateInfo.setPVertexInputState(&vertexInputInfo);
+    pipelineCreateInfo.setPInputAssemblyState(&inputAssembly);
+    pipelineCreateInfo.setPViewportState(&viewportState);
+    pipelineCreateInfo.setPRasterizationState(&rasterizer);
+    pipelineCreateInfo.setPMultisampleState(&multiSampling);
+    pipelineCreateInfo.setPDepthStencilState(&depthStencil);
+    pipelineCreateInfo.setPColorBlendState(&colorBlending);
+    pipelineCreateInfo.setLayout(m_postPipelineLayout);
+    pipelineCreateInfo.setRenderPass(m_postRenderPass);
+    pipelineCreateInfo.setSubpass(0);
+    pipelineCreateInfo.setBasePipelineHandle(nullptr);
 
-    VkGraphicsPipelineCreateInfo pipelineInfo{};
-    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = shaderStages;
-    pipelineInfo.pVertexInputState = &vertexInputInfo;
-    pipelineInfo.pInputAssemblyState = &inputAssembly;
-    pipelineInfo.pViewportState = &viewportState;
-    pipelineInfo.pRasterizationState = &rasterizer;
-    pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pDepthStencilState = &depthStencil;
-    pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.layout = m_postPipelineLayout;
-    pipelineInfo.renderPass = m_postRenderPass;
-    pipelineInfo.subpass = 0;
-    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    vk::Result   result;
+    vk::Pipeline pipeline;
+    std::tie(result, pipeline) = m_device.createGraphicsPipeline(VK_NULL_HANDLE, pipelineCreateInfo);
+     
 
-    vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
-        &m_postPipeline);
+    switch (result)
+    {
+    case vk::Result::eSuccess: 
+        m_postPipeline = pipeline;
+        break;
+    case vk::Result::ePipelineCompileRequiredEXT:
+        // something meaningfull here
+        break;
+    default: assert(false);  // should never happen
+    }
 
     // The pipeline has fully compiled copies of the shaders, so these
     // intermediate (SPV) versions can be destroyed.
     // @@
     // For the two modules fragShaderModule and vertShaderModule
     // destroy right *here* via vkDestroyShaderModule(m_device, ..., nullptr);
-
+    m_device.destroyShaderModule(fragShaderModule);
+    m_device.destroyShaderModule(vertShaderModule);
     // To destroy:  vkDestroyPipelineLayout(m_device, m_postPipelineLayout, nullptr);
     //  and:        vkDestroyPipeline(m_device, m_postPipeline, nullptr);
     // Document the vkCreateGraphicsPipelines call with an api_dump.  
