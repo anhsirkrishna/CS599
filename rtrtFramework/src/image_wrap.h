@@ -1,24 +1,25 @@
+#include <vulkan/vulkan.hpp>
 
 # pragma once
 
 struct ImageWrap
 {
-    VkImage          image{};
-    VkDeviceMemory   memory{};
-    VkSampler        sampler{};
-    VkImageView      imageView{};
-    VkImageLayout    imageLayout{};
+    vk::Image          image;
+    vk::DeviceMemory   memory;
+    vk::Sampler        sampler;
+    vk::ImageView      imageView;
+    vk::ImageLayout    imageLayout;
     
-    void destroy(VkDevice device)
+    void destroy(vk::Device device)
     {
-        vkDestroyImage(device, image, nullptr);
-        vkFreeMemory(device, memory, nullptr);
-        vkDestroyImageView(device, imageView, nullptr);
-        vkDestroySampler(device, sampler, nullptr);
+        device.destroyImage(image);
+        device.destroyImageView(imageView);
+        device.freeMemory(memory);
+        device.destroySampler(sampler);
     }
     
-    VkDescriptorImageInfo Descriptor() const 
+    vk::DescriptorImageInfo Descriptor() const 
     {
-        return VkDescriptorImageInfo({sampler, imageView, imageLayout});
+        return vk::DescriptorImageInfo({sampler, imageView, imageLayout});
     }
 };

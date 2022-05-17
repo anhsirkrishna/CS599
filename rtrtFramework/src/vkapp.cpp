@@ -41,7 +41,7 @@ VkApp::VkApp(App* _app) : app(_app)
     createCommandPool();
     
     createSwapchain();
-    // createDepthResource();
+    createDepthResource();
     // createPostRenderPass();
     // createPostFrameBuffers();
 

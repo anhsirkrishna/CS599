@@ -239,7 +239,7 @@ public:
        
     
     std::string loadFile(const std::string& filename);
-    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+    uint32_t findMemoryType(uint32_t typeBits, vk::MemoryPropertyFlags properties);
     
     BufferWrap createStagedBufferWrap(const VkCommandBuffer& cmdBuf,
                                       const VkDeviceSize&    size,
@@ -269,13 +269,11 @@ public:
     ImageWrap createBufferImage(VkExtent2D& size);
     
     ImageWrap createImageWrap(uint32_t width, uint32_t height,
-                              VkFormat format,
-                              VkImageUsageFlags usage,
-                              VkMemoryPropertyFlags properties,
-                              uint32_t mipLevels=1);
+                              vk::Format format, vk::ImageUsageFlags usage,
+                              vk::MemoryPropertyFlags properties, uint mipLevels = 1);
 
-    VkImageView createImageView(VkImage image, VkFormat format,
-                                VkImageAspectFlagBits aspect=VK_IMAGE_ASPECT_COLOR_BIT);
+    VkImageView createImageView(vk::Image image, vk::Format format,
+                                vk::ImageAspectFlags aspect);
     VkSampler createTextureSampler();
     
     void generateMipmaps(VkImage image, VkFormat imageFormat,
