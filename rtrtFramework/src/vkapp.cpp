@@ -80,11 +80,13 @@ VkApp::VkApp(App* _app) : app(_app)
 
 void VkApp::drawFrame()
 {        
-    //prepareFrame();
+    prepareFrame();
     
     //VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     //beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     //vkBeginCommandBuffer(m_commandBuffer, &beginInfo);
+    vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+    m_commandBuffer.begin(beginInfo);
     {   // Extra indent for recording commands into m_commandBuffer
         //updateCameraBuffer();
         
@@ -95,12 +97,13 @@ void VkApp::drawFrame()
         // else {
         //     rasterize(); }
         
-        //postProcess(); //  tone mapper and output to swapchain image.
+        postProcess(); //  tone mapper and output to swapchain image.
         
         // vkEndCommandBuffer(m_commandBuffer);
+        m_commandBuffer.end();
     }   // Done recording;  Execute!
     
-        //submitFrame();  // Submit for display
+        submitFrame();  // Submit for display
 }
 
 VkAccessFlags accessFlagsForImageLayout(VkImageLayout layout)
@@ -152,18 +155,16 @@ VkPipelineStageFlags pipelineStageForLayout(VkImageLayout layout)
 // Post processing pass: tone mapper, UI
 void VkApp::postProcess()
 {
-    std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = { {1,1,1,1} };
-    clearValues[1].depthStencil = { 1.0f, 0 };
 
-    VkRenderPassBeginInfo _i{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-    _i.clearValueCount = 2;
-    _i.pClearValues = clearValues.data();
-    _i.renderPass = m_postRenderPass;
-    _i.framebuffer = m_framebuffers[m_swapchainIndex];
-    _i.renderArea = { {0, 0}, VkExtent2D(windowSize) };
+    std::array<vk::ClearValue, 2> clearValues;
+    clearValues[0].color = vk::ClearColorValue(std::array<float, 4>({ { 1.0f, 1.0f, 1.0f, 1.0f } }));
+    clearValues[1].depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
 
-    vkCmdBeginRenderPass(m_commandBuffer, &_i, VK_SUBPASS_CONTENTS_INLINE);
+    vk::RenderPassBeginInfo renderPassBeginInfo(
+        m_postRenderPass, m_framebuffers[m_swapchainIndex], 
+        vk::Rect2D(vk::Offset2D(0, 0), VkExtent2D(windowSize)), clearValues);
+
+    m_commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
     {   // extra indent for renderpass commands
         //VkViewport viewport{0.0f, 0.0f,
         //    static_cast<float>(windowSize.width), static_cast<float>(windowSize.height),
@@ -177,20 +178,20 @@ void VkApp::postProcess()
             / static_cast<float>(windowSize.height);
         //vkCmdPushConstants(m_commandBuffer, m_postPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
         //                   sizeof(float), &aspectRatio);
-        vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_postPipeline);
+        m_commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_postPipeline);
         //vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         //                       m_postPipelineLayout, 0, 0, nullptr, 0, nullptr);
 
         // Weird! This draws 3 vertices but with no vertices/triangles buffers bound in.
         // Hint: The vertex shader fabricates vertices from gl_VertexIndex
-        vkCmdDraw(m_commandBuffer, 3, 1, 0, 0);
+        m_commandBuffer.draw(3, 1, 0, 0);
 
 #ifdef GUI
         ImGui::Render();  // Rendering UI
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), m_commandBuffer);
 #endif
     }
-    vkCmdEndRenderPass(m_commandBuffer);
+    m_commandBuffer.endRenderPass();
 }
 
 
@@ -244,12 +245,14 @@ void VkApp::submitTemptCppCmdBuffer(vk::CommandBuffer cmdBuffer) {
 void VkApp::prepareFrame()
 {
     // Acquire the next image from the swap chain --> m_swapchainIndex
-    VkResult result = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX, m_readSemaphore,
-                                            (VkFence)VK_NULL_HANDLE, &m_swapchainIndex);
+    //VkResult result = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX, m_readSemaphore,
+    //                                        (VkFence)VK_NULL_HANDLE, &m_swapchainIndex);
+    m_device.acquireNextImageKHR(m_swapchain, UINT64_MAX, m_readSemaphore, 
+        (VkFence)VK_NULL_HANDLE, &m_swapchainIndex);
 
     // Check if window has been resized -- or other(??) swapchain specific event
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        recreateSizedResources(VkExtent2D(windowSize)); }
+    //if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+    //    recreateSizedResources(VkExtent2D(windowSize)); }
 
     // Use a fence to wait until the command buffer has finished execution before using it again
     while (vk::Result::eTimeout == m_device.waitForFences(1, &m_waitFence, VK_TRUE, 1'000'000))

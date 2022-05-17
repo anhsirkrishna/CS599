@@ -24,6 +24,8 @@ void VkApp::destroyAllVulkanResources()
     // freeing the commandBuffer is optional, 
     // as it will automatically freed when the corresponding CommandPool is
     // destroyed.
+    m_device.waitIdle();
+
     m_device.destroyPipeline(m_postPipeline);
     m_device.destroyPipelineLayout(m_postPipelineLayout);
 
@@ -784,7 +786,7 @@ void VkApp::createPostFrameBuffers()
 
     // Each of the three swapchain images gets an associated frame
     // buffer, all sharing one depth buffer.
-    m_framebuffers.resize(m_imageCount);
+    m_framebuffers.reserve(m_imageCount);
     for (uint32_t i = 0; i < m_imageCount; i++) {
         fbattachments[0] = m_imageViews[i];         // A color attachment from the swap chain
         fbattachments[1] = m_depthImage.imageView;  // A depth attachment
