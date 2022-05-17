@@ -130,7 +130,7 @@ public:
     void createDepthResource();
     
     VkPipelineLayout m_postPipelineLayout{VK_NULL_HANDLE};
-    VkRenderPass m_postRenderPass{};
+    vk::RenderPass m_postRenderPass;
     void createPostRenderPass();
     
     std::vector<VkFramebuffer> m_framebuffers{}; // One frambuffer per swapchain image.
