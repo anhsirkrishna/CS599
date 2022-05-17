@@ -24,6 +24,11 @@ void VkApp::destroyAllVulkanResources()
     // freeing the commandBuffer is optional, 
     // as it will automatically freed when the corresponding CommandPool is
     // destroyed.
+    for (auto& frameBuffer : m_framebuffers)
+    {
+        m_device.destroyFramebuffer(frameBuffer);
+    }
+
     m_device.destroyRenderPass(m_postRenderPass);
 
     m_depthImage.destroy(m_device);
@@ -762,16 +767,17 @@ void VkApp::createPostRenderPass()
 // usually a color buffer and a depth buffer.
 void VkApp::createPostFrameBuffers()
 {
-    std::array<VkImageView, 2> fbattachments{};
+    std::array<vk::ImageView, 2> fbattachments;
 
     // Create frame buffers for every swap chain image
     VkFramebufferCreateInfo _ci{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
-    _ci.renderPass = m_postRenderPass;
-    _ci.width = windowSize.width;
-    _ci.height = windowSize.height;
-    _ci.layers = 1;
-    _ci.attachmentCount = 2;
-    _ci.pAttachments = fbattachments.data();
+    vk::FramebufferCreateInfo fbcreateInfo;
+    fbcreateInfo.setRenderPass(m_postRenderPass);
+    fbcreateInfo.setWidth(windowSize.width);
+    fbcreateInfo.setHeight(windowSize.height);
+    fbcreateInfo.setLayers(1);
+    fbcreateInfo.setAttachmentCount(2);
+    fbcreateInfo.setPAttachments(fbattachments.data());
 
     // Each of the three swapchain images gets an associated frame
     // buffer, all sharing one depth buffer.
@@ -779,7 +785,7 @@ void VkApp::createPostFrameBuffers()
     for (uint32_t i = 0; i < m_imageCount; i++) {
         fbattachments[0] = m_imageViews[i];         // A color attachment from the swap chain
         fbattachments[1] = m_depthImage.imageView;  // A depth attachment
-        vkCreateFramebuffer(m_device, &_ci, nullptr, &m_framebuffers[i]);
+        m_framebuffers.push_back(m_device.createFramebuffer(fbcreateInfo));
     }
 
     // To destroy: In a loop, call: vkDestroyFramebuffer(m_device, m_framebuffers[i], nullptr);
