@@ -1,9 +1,11 @@
 
 #version 450
+layout(location = 0) out vec2 uv;
 
-vec3 points[3] = vec3[]( vec3(-1,-1,0), vec3(-1,3,0), vec3(3,-1,0) );
+vec2 points[3] = vec2[]( vec2(0,0), vec2(0,2), vec2(2,0) );
 
 void main()
 {
-  gl_Position.xyz = points[gl_VertexIndex];
+  uv = points[gl_VertexIndex];
+  gl_Position.xyz = vec3(uv*2.0f-1.0f, 1.0);
 }

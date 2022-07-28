@@ -3,7 +3,7 @@
 
 #include <algorithm>
 #include "vulkan/vulkan_core.h"
-//#include <vulkan/vulkan.hpp>  // A modern C++ API for Vulkan. Beware 14K lines of code
+#include <vulkan/vulkan.hpp>  // A modern C++ API for Vulkan. Beware 14K lines of code
 
 // Imgui
 //#define GUI
@@ -28,7 +28,7 @@
 #define GLM_FORCE_RADIANS
 #define GLM_SWIZZLE
 #include <glm/glm.hpp>
-#include <vulkan/vulkan.hpp>
+//#include <vulkan/vulkan.hpp>
 // The OBJ model
 struct ObjData
 {
@@ -39,6 +39,13 @@ struct ObjData
     BufferWrap indexBuffer;     // Device buffer of the indices forming triangles
     BufferWrap matColorBuffer;  // Device buffer of array of 'Wavefront material'
     BufferWrap matIndexBuffer;  // Device buffer of array of 'Wavefront material'
+
+    void destroy(vk::Device& device) {
+        vertexBuffer.destroy(device);
+        indexBuffer.destroy(device);
+        matColorBuffer.destroy(device);
+        matIndexBuffer.destroy(device);
+    }
 };
 
 struct ObjInst
@@ -144,8 +151,8 @@ public:
     void initGUI();
     #endif
     
-    VkRenderPass m_scanlineRenderPass{VK_NULL_HANDLE};
-    VkFramebuffer m_scanlineFramebuffer{VK_NULL_HANDLE};
+    vk::RenderPass m_scanlineRenderPass;
+    vk::Framebuffer m_scanlineFramebuffer;
     void createScanlineRenderPass();
 
     ImageWrap m_scImageBuffer{};
@@ -173,8 +180,8 @@ public:
     DescriptorWrap m_scDesc{};
     void createScDescriptorSet();
 
-    VkPipelineLayout            m_scanlinePipelineLayout{};
-    VkPipeline                  m_scanlinePipeline{};
+    vk::PipelineLayout            m_scanlinePipelineLayout;
+    vk::Pipeline                  m_scanlinePipeline;
     void createScPipeline();
 
     BufferWrap m_matrixBW{};  // Device-Host of the camera matrices
@@ -221,7 +228,7 @@ public:
     void createDenoiseCompPipeline();
 
     // Run loop 
-    bool useRaytracer = true;
+    bool useRaytracer = false;
     void prepareFrame();
     void ResetRtAccumulation();
     
@@ -241,32 +248,35 @@ public:
     std::string loadFile(const std::string& filename);
     uint32_t findMemoryType(uint32_t typeBits, vk::MemoryPropertyFlags properties);
     
-    BufferWrap createStagedBufferWrap(const VkCommandBuffer& cmdBuf,
-                                      const VkDeviceSize&    size,
+    BufferWrap createStagedBufferWrap(const vk::CommandBuffer& cmdBuf,
+                                      const vk::DeviceSize&    size,
                                       const void*            data,
-                                      VkBufferUsageFlags     usage);
+                                      vk::BufferUsageFlags     usage);
     template <typename T>
-    BufferWrap createStagedBufferWrap(const VkCommandBuffer& cmdBuf,
+    BufferWrap createStagedBufferWrap(const vk::CommandBuffer& cmdBuf,
                                       const std::vector<T>&  data,
-                                      VkBufferUsageFlags     usage)
+                                      vk::BufferUsageFlags     usage)
     {
         return createStagedBufferWrap(cmdBuf, sizeof(T)*data.size(), data.data(), usage);
     }
     
 
-    BufferWrap createBufferWrap(VkDeviceSize size, VkBufferUsageFlags usage,
-                                VkMemoryPropertyFlags properties);
+    BufferWrap createBufferWrap(vk::DeviceSize size, vk::BufferUsageFlags usage,
+                                vk::MemoryPropertyFlags properties);
 
-     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+     void copyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size);
     
     
-    void transitionImageLayout(VkImage image, VkFormat format,
-                               VkImageLayout oldLayout, VkImageLayout newLayout,
-                               uint32_t mipLevels=1);
-    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+    void transitionImageLayout(vk::Image image,
+                                vk::Format format,
+                                vk::ImageLayout oldLayout,
+                                vk::ImageLayout newLayout,
+                                uint32_t mipLevels=1);
+
+    void copyBufferToImage(vk::Buffer buffer, vk::Image image, uint32_t width, uint32_t height);
     
     ImageWrap createTextureImage(std::string fileName);
-    ImageWrap createBufferImage(VkExtent2D& size);
+    ImageWrap createBufferImage(vk::Extent2D& size);
     
     ImageWrap createImageWrap(uint32_t width, uint32_t height,
                               vk::Format format, vk::ImageUsageFlags usage,
@@ -277,5 +287,8 @@ public:
     VkSampler createTextureSampler();
     
     void generateMipmaps(VkImage image, VkFormat imageFormat,
+                         int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
+
+    void generateMipmaps(vk::Image image, vk::Format imageFormat,
                          int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
 };

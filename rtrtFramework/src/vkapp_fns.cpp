@@ -26,6 +26,23 @@ void VkApp::destroyAllVulkanResources()
     // destroyed.
     m_device.waitIdle();
 
+    m_device.destroyPipelineLayout(m_scanlinePipelineLayout);
+    m_device.destroyPipeline(m_scanlinePipeline);
+
+    m_scDesc.destroy(m_device);
+
+    m_device.destroyRenderPass(m_scanlineRenderPass);
+    m_device.destroyFramebuffer(m_scanlineFramebuffer);
+
+    m_objDescriptionBW.destroy(m_device);
+    m_matrixBW.destroy(m_device);
+
+    for (auto t : m_objText) t.destroy(m_device);
+    for (auto ob : m_objData) ob.destroy(m_device);
+
+    m_scImageBuffer.destroy(m_device);
+    m_postDesc.destroy(m_device);
+
     m_device.destroyPipeline(m_postPipeline);
     m_device.destroyPipelineLayout(m_postPipelineLayout);
 
@@ -810,6 +827,9 @@ void VkApp::createPostPipeline()
     //VkPushConstantRange pushConstantRanges = {VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)};
     //createInfo.pushConstantRangeCount = 1;
     //createInfo.pPushConstantRanges    = &pushConstantRanges;
+
+    createInfo.setSetLayoutCount(1);
+    createInfo.setPSetLayouts(&m_postDesc.descSetLayout);
 
     // What we can do now as a first pass:
     m_postPipelineLayout = m_device.createPipelineLayout(createInfo);

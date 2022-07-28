@@ -45,26 +45,29 @@ VkApp::VkApp(App* _app) : app(_app)
     createPostRenderPass();
     createPostFrameBuffers();
 
-    // createPostDescriptor();
+    createScBuffer();
+    createPostDescriptor();
     createPostPipeline();
 
     // #ifdef GUI
     // initGUI();
     // #endif
     
-    // myloadModel("models/living_room.obj", glm::mat4());
+    myloadModel("models/living_room.obj", glm::mat4());
 
-    // createScBuffer();
+    createMatrixBuffer();
+    createObjDescriptionBuffer();
+    createScanlineRenderPass();
+    createScDescriptorSet();
+    createScPipeline();
+    
     // createRtBuffers();
     // createDenoiseBuffer();
 
-    // createScanlineRenderPass();
+    
     // createStuff();
 
-    // createMatrixBuffer();
-    // createObjDescriptionBuffer();
-    // createScDescriptorSet();
-    // createScPipeline();
+    
 
     // //init ray tracing capabilities
     // initRayTracing();
@@ -88,14 +91,16 @@ void VkApp::drawFrame()
     vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     m_commandBuffer.begin(beginInfo);
     {   // Extra indent for recording commands into m_commandBuffer
-        //updateCameraBuffer();
+        updateCameraBuffer();
         
         // Draw scene
-        // if (useRaytracer) {
-        //     raytrace();`
-        //     denoise(); }
-        // else {
-        //     rasterize(); }
+         if (useRaytracer) {
+             //raytrace();
+             //denoise(); 
+         }
+         else {
+             rasterize(); 
+         }
         
         postProcess(); //  tone mapper and output to swapchain image.
         
@@ -181,7 +186,7 @@ void VkApp::postProcess()
         m_commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_postPipeline);
         //vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         //                       m_postPipelineLayout, 0, 0, nullptr, 0, nullptr);
-
+        m_commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_postPipelineLayout, 0, 1, &m_postDesc.descSet, 0, nullptr);
         // Weird! This draws 3 vertices but with no vertices/triangles buffers bound in.
         // Hint: The vertex shader fabricates vertices from gl_VertexIndex
         m_commandBuffer.draw(3, 1, 0, 0);
