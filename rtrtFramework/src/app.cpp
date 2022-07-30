@@ -156,7 +156,7 @@ App::App(int argc, char** argv)
     while (argi<argc) {
         std::string arg = argv[argi++];
         if (arg == "-d") {
-            doApiDump = true;
+            doApiDump = false;
             printf("Api dump enabled\n");
         }
         else {

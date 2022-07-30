@@ -39,12 +39,14 @@ struct ObjData
     BufferWrap indexBuffer;     // Device buffer of the indices forming triangles
     BufferWrap matColorBuffer;  // Device buffer of array of 'Wavefront material'
     BufferWrap matIndexBuffer;  // Device buffer of array of 'Wavefront material'
+    BufferWrap lightBuffer;     // Device buffer of all the light triangle indeces.
 
     void destroy(vk::Device& device) {
         vertexBuffer.destroy(device);
         indexBuffer.destroy(device);
         matColorBuffer.destroy(device);
         matIndexBuffer.destroy(device);
+        lightBuffer.destroy(device);
     }
 };
 

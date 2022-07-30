@@ -226,7 +226,7 @@ ImageWrap VkApp::createTextureImage(std::string fileName)
     generateMipmaps(myImage.image, VK_FORMAT_R8G8B8A8_UNORM, texWidth, texHeight, mipLevels);
     
     vk::ImageAspectFlags aspect;
-    myImage.imageView = createImageView(myImage.image, vk::Format::eB8G8R8A8Unorm, aspect);
+    myImage.imageView = createImageView(myImage.image, vk::Format::eB8G8R8A8Unorm, vk::ImageAspectFlagBits::eColor);
     myImage.sampler = createTextureSampler();
     myImage.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     return myImage;
@@ -453,7 +453,7 @@ BufferWrap VkApp::createStagedBufferWrap(const vk::CommandBuffer& cmdBuf,
     m_device.unmapMemory(staging.memory);
 
 
-    BufferWrap bw = createBufferWrap(size, vk::BufferUsageFlagBits::eTransferSrc | usage,
+    BufferWrap bw = createBufferWrap(size, vk::BufferUsageFlagBits::eTransferDst | usage,
         vk::MemoryPropertyFlagBits::eDeviceLocal);
     copyBuffer(staging.buffer, bw.buffer, size);
 
@@ -710,7 +710,7 @@ ImageWrap VkApp::createBufferImage(vk::Extent2D& size)
 
     //myImage.imageView = createImageView(myImage.image, VK_FORMAT_R32G32B32A32_SFLOAT);
     vk::ImageAspectFlags aspect;
-    myImage.imageView = createImageView(myImage.image, vk::Format::eR32G32B32A32Sfloat, aspect);
+    myImage.imageView = createImageView(myImage.image, vk::Format::eR32G32B32A32Sfloat, vk::ImageAspectFlagBits::eColor);
     myImage.sampler = createTextureSampler();
     //myImage.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
     myImage.imageLayout = vk::ImageLayout::eGeneral;
@@ -1240,7 +1240,9 @@ void VkApp::rasterize()
             inst.transform,      // Object's instance transform.
             {0.5f, 2.5f, 3.0f},  // light position;  Should not be hard-coded here!
             inst.objIndex,       // instance Id
-            2.5f                 // light intensity;  Should not be hard-coded here!
+            2.5f,                 // light intensity;  Should not be hard-coded here!
+            1,                   //Light Type ?
+            0.2f                 //Ambient light 
         };
 
         pcRaster.objIndex = inst.objIndex;  // Telling which object is drawn

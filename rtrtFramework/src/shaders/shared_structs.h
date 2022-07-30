@@ -44,6 +44,7 @@ struct ObjDesc
   uint64_t indexAddress;          // Address of the index buffer
   uint64_t materialAddress;       // Address of the material buffer
   uint64_t materialIndexAddress;  // Address of the triangle material index buffer
+  uint64_t lightTriangleIndexAddress;  // Address of the triangle material index buffer
 };
 
 // Uniform buffer set at each frame
@@ -63,6 +64,7 @@ struct PushConstantRaster
   uint  objIndex;
   float lightIntensity;
   int   lightType;
+  float ambientLight;
 };
 
 

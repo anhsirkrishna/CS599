@@ -68,7 +68,7 @@ void VkApp::myloadModel(const std::string& filename, glm::mat4 transform)
 {
     ModelData meshdata;
     meshdata.readAssimpFile(filename.c_str(), glm::mat4());
-
+    
     printf("vertices: %ld\n", meshdata.vertices.size());
     printf("indices: %ld (%ld)\n", meshdata.indicies.size(), meshdata.indicies.size()/3);
     printf("materials: %ld\n", meshdata.materials.size());
@@ -90,7 +90,20 @@ void VkApp::myloadModel(const std::string& filename, glm::mat4 transform)
     // Hint: Triangle i has
     //   vertices in meshdata.vertices, indexed by [3*i], [3*i+1], [3*i+2]
     //   and a material in meshdata.materials, indexed by meshdata.matIndx[i]
-    
+    std::vector<uint32_t> lightTriangleIndeces;
+    for (int i = 0; i < meshdata.matIndx.size(); i++) {
+        if (meshdata.materials[meshdata.matIndx[i]].emission.r > 0 ||
+            meshdata.materials[meshdata.matIndx[i]].emission.g > 0 ||
+            meshdata.materials[meshdata.matIndx[i]].emission.b > 0) {
+            //Found an emittor
+            //Scale the emission by a factor of 5
+            meshdata.materials[meshdata.matIndx[i]].emission *= 5;
+
+            //Store the index of the emittor 
+            lightTriangleIndeces.push_back(i);
+        }
+    }
+
     ObjData object;
     object.nbIndices  = static_cast<uint32_t>(meshdata.indicies.size());
     object.nbVertices = static_cast<uint32_t>(meshdata.vertices.size());
@@ -117,7 +130,8 @@ void VkApp::myloadModel(const std::string& filename, glm::mat4 transform)
                                                 vk::BufferUsageFlagBits::eIndexBuffer | rtFlags);
     object.matColorBuffer = createStagedBufferWrap(cmdBuf, meshdata.materials, flag);
     object.matIndexBuffer = createStagedBufferWrap(cmdBuf, meshdata.matIndx, flag);
-  
+    object.lightBuffer = createStagedBufferWrap(cmdBuf, lightTriangleIndeces, flag);
+    
     //submitTempCmdBuffer(cmdBuf);
     submitTemptCppCmdBuffer(cmdBuf);
     
@@ -140,6 +154,7 @@ void VkApp::myloadModel(const std::string& filename, glm::mat4 transform)
     desc.indexAddress         = getBufferDeviceAddress(m_device, object.indexBuffer.buffer);
     desc.materialAddress      = getBufferDeviceAddress(m_device, object.matColorBuffer.buffer);
     desc.materialIndexAddress = getBufferDeviceAddress(m_device, object.matIndexBuffer.buffer);
+    desc.lightTriangleIndexAddress = getBufferDeviceAddress(m_device, object.lightBuffer.buffer);
 
     m_objData.emplace_back(object);
     m_objDesc.emplace_back(desc);

@@ -37,34 +37,46 @@ layout(binding=eTextures) uniform sampler2D[] textureSamplers;
 float pi = 3.14159;
 void main()
 {
-  // Material of the object
-  ObjDesc    obj = objDesc.i[pcRaster.objIndex];
-  MatIndices matIndices  = MatIndices(obj.materialIndexAddress);
-  Materials  materials   = Materials(obj.materialAddress);
+    // Material of the object
+    ObjDesc    obj = objDesc.i[pcRaster.objIndex];
+    MatIndices matIndices  = MatIndices(obj.materialIndexAddress);
+    Materials  materials   = Materials(obj.materialAddress);
   
-  int               matIndex = matIndices.i[gl_PrimitiveID];
-  Material mat      = materials.m[matIndex];
+    int               matIndex = matIndices.i[gl_PrimitiveID];
+    Material mat      = materials.m[matIndex];
   
-  vec3 N = normalize(worldNrm);
-  vec3 V = normalize(viewDir);
-  vec3 lDir = pcRaster.lightPosition - worldPos;
-  vec3 L = normalize(lDir);
-
-  float NL = max(dot(N,L),0.0);
-
+    vec3 N = normalize(worldNrm);
+    vec3 V = normalize(viewDir);
+    vec3 lDir = pcRaster.lightPosition - worldPos;
+    vec3 L = normalize(lDir);
+    vec3 H = normalize(L+V);
+    
+    float NL = max(dot(N, L), 0.0);
+    float NH = max(dot(N, H), 0.0);
+    float LH = max(dot(L, H), 0.0);
   
-  vec3 Kd = mat.diffuse;
-  vec3 Ks = mat.specular;
-  const float alpha = mat.shininess;
+    vec3 Kd = mat.diffuse;
+    vec3 Ks = mat.specular;
+    const float alpha = mat.shininess;
   
-  if (mat.textureId >= 0)
-  {
+    if (mat.textureId >= 0)
+    {
     int  txtOffset  = obj.txtOffset;
     uint txtId      = txtOffset + mat.textureId;
     Kd = texture(textureSamplers[nonuniformEXT(txtId)], texCoord).xyz;
-  }
+    }
   
-  // This very minimal lighting calculation should be replaced with a modern BRDF calculation. 
-  fragColor.xyz = pcRaster.lightIntensity*NL*Kd/pi;
+    // This very minimal lighting calculation should be replaced with a modern BRDF calculation.
+
+    vec3 brdf;
+    float distribution;
+        
+    vec3 fresnel = Ks + ((vec3(1,1,1) - Ks)*pow((1-LH), 5));
+    float visibility = 1/(LH*LH);
+
+    distribution = ((alpha+2)/(2*pi))*pow(NH, alpha);
+    brdf = (Kd/pi) + ((fresnel*visibility*distribution)/4);
+
+    fragColor.xyz = pcRaster.ambientLight*Kd + pcRaster.lightIntensity*NL*brdf;
 
 }
