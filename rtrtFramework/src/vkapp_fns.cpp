@@ -10,6 +10,50 @@
 #include "app.h"
 #include "extensions_vk.hpp"
 
+#ifdef GUI
+void VkApp::initGUI()
+{
+    uint subpassID = 0;
+
+    // UI
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.LogFilename = nullptr;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
+
+    std::vector<VkDescriptorPoolSize> poolSize{ {VK_DESCRIPTOR_TYPE_SAMPLER, 1}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1} };
+    VkDescriptorPoolCreateInfo        poolInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+    poolInfo.maxSets = 2;
+    poolInfo.poolSizeCount = 2;
+    poolInfo.pPoolSizes = poolSize.data();
+    vkCreateDescriptorPool(m_device, &poolInfo, nullptr, &m_imguiDescPool);
+
+    // Setup Platform/Renderer back ends
+    ImGui_ImplVulkan_InitInfo init_info = {};
+    init_info.Instance = m_instance;
+    init_info.PhysicalDevice = m_physicalDevice;
+    init_info.Device = m_device;
+    init_info.QueueFamily = m_graphicsQueueIndex;
+    init_info.Queue = m_queue;
+    init_info.PipelineCache = VK_NULL_HANDLE;
+    init_info.DescriptorPool = m_imguiDescPool;
+    init_info.Subpass = subpassID;
+    init_info.MinImageCount = 2;
+    init_info.ImageCount = m_imageCount;
+    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    init_info.CheckVkResultFn = nullptr;
+    init_info.Allocator = nullptr;
+
+    ImGui_ImplVulkan_Init(&init_info, m_postRenderPass);
+
+    // Upload Fonts
+    VkCommandBuffer cmdbuf = createTempCmdBuffer();
+    ImGui_ImplVulkan_CreateFontsTexture(cmdbuf);
+    submitTempCmdBuffer(cmdbuf);
+
+    ImGui_ImplGlfw_InitForVulkan(app->GLFW_window, true);
+}
+#endif
 
 void VkApp::destroyAllVulkanResources()
 {
@@ -25,6 +69,9 @@ void VkApp::destroyAllVulkanResources()
     // as it will automatically freed when the corresponding CommandPool is
     // destroyed.
     m_device.waitIdle();
+
+    m_device.destroyDescriptorPool(m_imguiDescPool, nullptr);
+    ImGui_ImplVulkan_Shutdown();
 
     m_device.destroyPipelineLayout(m_scanlinePipelineLayout);
     m_device.destroyPipeline(m_scanlinePipeline);

@@ -6,11 +6,11 @@
 #include <vulkan/vulkan.hpp>  // A modern C++ API for Vulkan. Beware 14K lines of code
 
 // Imgui
-//#define GUI
+#define GUI
 #ifdef GUI
 #include "backends/imgui_impl_glfw.h"
 #include "imgui.h"
-#include "imgui_impl_vulkan.h"
+#include "backends/imgui_impl_vulkan.h"
 #endif
 
 #ifdef _WIN32
