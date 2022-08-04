@@ -21,25 +21,26 @@
   <ItemGroup>
     <ClCompile Include="app.cpp" />
     <ClCompile Include="descriptor_wrap.cpp" />
+    <ClCompile Include="acceleration_wrap.cpp" />
     <ClCompile Include="vkapp.cpp" />
     <ClCompile Include="camera.cpp" />
     <ClCompile Include="extensions_vk.cpp" />
     <ClCompile Include="vkapp_fns.cpp" />
     <ClCompile Include="vkapp_loadModel.cpp" />
+    <ClCompile Include="vkapp_raytracing.cpp" />
     <ClCompile Include="vkapp_scanline.cpp" />
     <ClCompile Include="..\libs\imgui-master\backends\imgui_impl_glfw.cpp" />
     <ClCompile Include="..\libs\imgui-master\backends\imgui_impl_vulkan.cpp" />
     <ClCompile Include="..\libs\imgui-master\imgui.cpp" />
     <ClCompile Include="..\libs\imgui-master\imgui_draw.cpp" />
     <ClCompile Include="..\libs\imgui-master\imgui_widgets.cpp" />
-
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="shaders\post.vert">
       <FileType>Document</FileType>
       <LinkObjects>false</LinkObjects>
       <AdditionalInputs>shaders\shared_structs.h</AdditionalInputs>
-      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
       <Message>Compiling shader %(Identity)</Message>
       <Outputs>spv\%(Filename)%(Extension).spv</Outputs>
       <BuildInParallel>true</BuildInParallel>
@@ -48,7 +49,7 @@
       <FileType>Document</FileType>
       <LinkObjects>false</LinkObjects>
       <AdditionalInputs>shaders\shared_structs.h</AdditionalInputs>
-      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
       <Message>Compiling shader %(Identity)</Message>
       <Outputs>spv\%(Filename)%(Extension).spv</Outputs>
       <BuildInParallel>true</BuildInParallel>
@@ -57,7 +58,7 @@
       <FileType>Document</FileType>
       <LinkObjects>false</LinkObjects>
       <AdditionalInputs>shaders\shared_structs.h</AdditionalInputs>
-      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V  --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
       <Message>Compiling shader %(Identity)</Message>
       <Outputs>spv\%(Filename)%(Extension).spv</Outputs>
       <BuildInParallel>true</BuildInParallel>
@@ -66,7 +67,7 @@
       <FileType>Document</FileType>
       <LinkObjects>false</LinkObjects>
       <AdditionalInputs>shaders\shared_structs.h</AdditionalInputs>
-      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
       <Message>Compiling shader %(Identity)</Message>
       <Outputs>spv\%(Filename)%(Extension).spv</Outputs>
       <BuildInParallel>true</BuildInParallel>
@@ -75,7 +76,7 @@
       <FileType>Document</FileType>
       <LinkObjects>false</LinkObjects>
       <AdditionalInputs>shaders\shared_structs.h</AdditionalInputs>
-      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
       <Message>Compiling shader %(Identity)</Message>
       <Outputs>spv\%(Filename)%(Extension).spv</Outputs>
       <BuildInParallel>true</BuildInParallel>
@@ -84,7 +85,7 @@
       <FileType>Document</FileType>
       <LinkObjects>false</LinkObjects>
       <AdditionalInputs>shaders\shared_structs.h</AdditionalInputs>
-      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
       <Message>Compiling shader %(Identity)</Message>
       <Outputs>spv\%(Filename)%(Extension).spv</Outputs>
       <BuildInParallel>true</BuildInParallel>
@@ -93,7 +94,7 @@
       <FileType>Document</FileType>
       <LinkObjects>false</LinkObjects>
       <AdditionalInputs>shaders\shared_structs.h</AdditionalInputs>
-      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
       <Message>Compiling shader %(Identity)</Message>
       <Outputs>spv\%(Filename)%(Extension).spv</Outputs>
       <BuildInParallel>true</BuildInParallel>
@@ -102,7 +103,7 @@
       <FileType>Document</FileType>
       <LinkObjects>false</LinkObjects>
       <AdditionalInputs>shaders\shared_structs.h</AdditionalInputs>
-      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
       <Message>Compiling shader %(Identity)</Message>
       <Outputs>spv\%(Filename)%(Extension).spv</Outputs>
       <BuildInParallel>true</BuildInParallel>
@@ -111,7 +112,7 @@
       <FileType>Document</FileType>
       <LinkObjects>false</LinkObjects>
       <AdditionalInputs>shaders\shared_structs.h</AdditionalInputs>
-      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
       <Message>Compiling shader %(Identity)</Message>
       <Outputs>spv\%(Filename)%(Extension).spv</Outputs>
       <BuildInParallel>true</BuildInParallel>
@@ -120,7 +121,7 @@
       <FileType>Document</FileType>
       <LinkObjects>false</LinkObjects>
       <AdditionalInputs>shaders\shared_structs.h</AdditionalInputs>
-      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
       <Message>Compiling shader %(Identity)</Message>
       <Outputs>spv\%(Filename)%(Extension).spv</Outputs>
       <BuildInParallel>true</BuildInParallel>
@@ -129,7 +130,7 @@
       <FileType>Document</FileType>
       <LinkObjects>false</LinkObjects>
       <AdditionalInputs>shaders\shared_structs.h</AdditionalInputs>
-      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
+      <Command>cmd /C "if exist %(Identity)    %VULKAN_SDK%/Bin/glslangValidator.exe -V --target-env vulkan1.2 -o spv\%(Filename)%(Extension).spv   %(Identity)"</Command>
       <Message>Compiling shader %(Identity)</Message>
       <Outputs>spv\%(Filename)%(Extension).spv</Outputs>
       <BuildInParallel>true</BuildInParallel>
@@ -143,6 +144,7 @@
     <ClInclude Include="extensions_vk.hpp" />
     <ClInclude Include="image_wrap.h" />
     <ClInclude Include="vkapp.h" />
+    <ClInclude Include="acceleration_wrap.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

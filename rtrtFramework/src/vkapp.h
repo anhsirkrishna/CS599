@@ -23,6 +23,7 @@
 #include "buffer_wrap.h"
 #include "image_wrap.h"
 #include "descriptor_wrap.h"
+#include "acceleration_wrap.h"
 
 //#include "raytracing_wrap.h"
 #define GLM_FORCE_RADIANS
@@ -187,9 +188,13 @@ public:
     void createScPipeline();
 
     BufferWrap m_matrixBW{};  // Device-Host of the camera matrices
-    void   createMatrixBuffer();
+    void createMatrixBuffer();
     
-    //RaytracingBuilderKHR m_rtBuilder{};
+    BufferWrap m_scratch1;
+    BufferWrap m_scratch2;
+
+    RaytracingBuilderKHR m_rtBuilder{};
+
     float m_maxAnis = 0;
     PushConstantRay m_pcRay{};  // Push constant for ray tracer
     int m_num_atrous_iterations = 0;
@@ -201,22 +206,23 @@ public:
 
     // // Accelleration structure objects and functions
 
-    // //BlasInput objectToVkGeometryKHR(const ObjData& model);
-    // //void createBottomLevelAS(); void createTopLevelAS();
-    // void createRtAccelerationStructure();
+    BlasInput objectToVkGeometryKHR(const ObjData& model);
+    void createBottomLevelAS();
+    void createTopLevelAS();
+    void createRtAccelerationStructure();
 
-    // DescriptorWrap m_rtDesc{};
-    // void createRtDescriptorSet();
+    DescriptorWrap m_rtDesc{};
+    void createRtDescriptorSet();
 
-    VkPipelineLayout                                  m_rtPipelineLayout{};
-    VkPipeline                                        m_rtPipeline{};
+    vk::PipelineLayout                                  m_rtPipelineLayout;
+    vk::Pipeline                                        m_rtPipeline;
     void createRtPipeline();
     
     BufferWrap m_shaderBindingTableBW;
-    VkStridedDeviceAddressRegionKHR m_rgenRegion{};
-    VkStridedDeviceAddressRegionKHR m_missRegion{};
-    VkStridedDeviceAddressRegionKHR m_hitRegion{};
-    VkStridedDeviceAddressRegionKHR m_callRegion{};
+    vk::StridedDeviceAddressRegionKHR m_rgenRegion{};
+    vk::StridedDeviceAddressRegionKHR m_missRegion{};
+    vk::StridedDeviceAddressRegionKHR m_hitRegion{};
+    vk::StridedDeviceAddressRegionKHR m_callRegion{};
     void createRtShaderBindingTable();
 
     DescriptorWrap m_postDesc{};
@@ -225,8 +231,8 @@ public:
     DescriptorWrap m_denoiseDesc{};
     void createDenoiseDescriptorSet();
     
-    VkPipelineLayout            m_denoiseCompPipelineLayout{};
-    VkPipeline                  m_denoisePipelineX{}, m_denoisePipelineY{};
+    vk::PipelineLayout            m_denoiseCompPipelineLayout;
+    vk::Pipeline                  m_denoisePipelineX, m_denoisePipelineY;
     void createDenoiseCompPipeline();
 
     // Run loop 
@@ -293,4 +299,10 @@ public:
 
     void generateMipmaps(vk::Image image, vk::Format imageFormat,
                          int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
+
+    void imageLayoutBarrier(vk::CommandBuffer cmdbuffer,
+        vk::Image image,
+        vk::ImageLayout oldImageLayout,
+        vk::ImageLayout newImageLayout,
+        vk::ImageAspectFlags aspectMask = vk::ImageAspectFlagBits::eColor);
 };

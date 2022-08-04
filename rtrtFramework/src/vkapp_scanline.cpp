@@ -143,11 +143,11 @@ void imageLayoutBarrier(VkCommandBuffer cmdbuffer,
                          0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
 }*/
 
-void imageLayoutBarrier(vk::CommandBuffer cmdbuffer,
+void VkApp::imageLayoutBarrier(vk::CommandBuffer cmdbuffer,
                         vk::Image image,
                         vk::ImageLayout oldImageLayout,
                         vk::ImageLayout newImageLayout,
-                        vk::ImageAspectFlags aspectMask = vk::ImageAspectFlagBits::eColor)
+                        vk::ImageAspectFlags aspectMask)
 {
     vk::ImageSubresourceRange subresourceRange;
     subresourceRange.setAspectMask(aspectMask);
@@ -892,12 +892,14 @@ void VkApp::createScDescriptorSet()
 
     m_scDesc.setBindings(m_device, {
             {ScBindings::eMatrices, vk::DescriptorType::eUniformBuffer, 1,
-                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eRaygenKHR},
+                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eRaygenKHR | 
+                vk::ShaderStageFlagBits::eClosestHitKHR},
             {ScBindings::eObjDescs, vk::DescriptorType::eStorageBuffer, 1,
-                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment
-                | vk::ShaderStageFlagBits::eClosestHitKHR},
+                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | 
+                vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR},
             {ScBindings::eTextures, vk::DescriptorType::eCombinedImageSampler, nbTxt,
-                vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eClosestHitKHR}
+                vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eRaygenKHR | 
+                vk::ShaderStageFlagBits::eClosestHitKHR}
         });
               
     m_scDesc.write(m_device, ScBindings::eMatrices, m_matrixBW.buffer);

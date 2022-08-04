@@ -61,7 +61,7 @@ VkApp::VkApp(App* _app) : app(_app)
     createScDescriptorSet();
     createScPipeline();
     
-    // createRtBuffers();
+    createRtBuffers();
     // createDenoiseBuffer();
 
     
@@ -70,11 +70,11 @@ VkApp::VkApp(App* _app) : app(_app)
     
 
     // //init ray tracing capabilities
-    // initRayTracing();
-    // createRtAccelerationStructure();
-    // createRtDescriptorSet();
-    // createRtPipeline();
-    // createRtShaderBindingTable();
+    initRayTracing();
+    createRtAccelerationStructure();
+    createRtDescriptorSet();
+    createRtPipeline();
+    createRtShaderBindingTable();
 
     // createDenoiseDescriptorSet();
     // createDenoiseCompPipeline();
@@ -95,7 +95,7 @@ void VkApp::drawFrame()
         
         // Draw scene
          if (useRaytracer) {
-             //raytrace();
+             raytrace();
              //denoise(); 
          }
          else {

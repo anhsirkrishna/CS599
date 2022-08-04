@@ -73,6 +73,20 @@ void VkApp::destroyAllVulkanResources()
     m_device.destroyDescriptorPool(m_imguiDescPool, nullptr);
     ImGui_ImplVulkan_Shutdown();
 
+    m_scratch1.destroy(m_device);
+    m_scratch2.destroy(m_device);
+
+    m_shaderBindingTableBW.destroy(m_device);
+
+    m_rtColCurrBuffer.destroy(m_device);
+
+    m_rtDesc.destroy(m_device);
+
+    m_device.destroyPipelineLayout(m_rtPipelineLayout, nullptr);
+    m_device.destroyPipeline(m_rtPipeline, nullptr);
+
+    m_rtBuilder.destroy();
+
     m_device.destroyPipelineLayout(m_scanlinePipelineLayout);
     m_device.destroyPipeline(m_scanlinePipeline);
 
