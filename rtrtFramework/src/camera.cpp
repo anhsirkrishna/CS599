@@ -3,8 +3,7 @@
 #include "camera.h"
 
 Camera::Camera() : spin(-20.0), tilt(10.66), ry(0.57), front(0.1), back(1000.0),
-                   eye({2.279976, 1.677772, 6.640697})
-{
+                   eye({2.279976, 1.677772, 6.640697}), updated(false) {
 }
 
 glm::mat4 Camera::perspective(const float aspect)
@@ -37,6 +36,7 @@ void Camera::mouseMove(const float x, const float y)
     tilt += dy/3;
     posx = x;
     posy = y;
+    updated = true;
 }
 
 void Camera::setMousePosition(const float x, const float y)

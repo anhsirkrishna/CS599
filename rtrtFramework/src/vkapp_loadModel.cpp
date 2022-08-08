@@ -97,7 +97,7 @@ void VkApp::myloadModel(const std::string& filename, glm::mat4 transform)
             meshdata.materials[meshdata.matIndx[i]].emission.b > 0) {
             //Found an emittor
             //Scale the emission by a factor of 5
-            meshdata.materials[meshdata.matIndx[i]].emission *= 5;
+            //meshdata.materials[meshdata.matIndx[i]].emission *= 5;
 
             //Store the index of the emittor 
             lightTriangleIndeces.push_back(i);

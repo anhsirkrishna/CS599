@@ -83,6 +83,13 @@ struct PushConstantRay
   float np_m;
   float np_b;
   bool  useHistory;*/
+	bool diffuseOnly;
+	uint frameSeed;
+	bool clear;
+	int depth;
+	float rr;
+	bool specular;
+	float emissionFactor;
 	vec4 tempLightPos; // TEMPORARY – vec4(0.5f, 2.5f, 3.0f, 0.0);
 	vec4 tempLightInt; // TEMPORARY -- vec4(2.5, 2.5, 2.5, 0.0);
 	vec4 tempAmbient; // TEMPORARY – vec4(0.2);
@@ -122,6 +129,7 @@ struct PushConstantDenoise
 
 struct RayPayload
 {
+	uint seed;
 	bool hit; // Does the ray intersect anything or not?
 	vec3 hitPos; // The world coordinates of the hit point.
 	int instanceIndex; // Index of the object instance hit (we have only one, so =0)

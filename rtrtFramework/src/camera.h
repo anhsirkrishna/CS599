@@ -16,7 +16,11 @@ class Camera
     float spin;
     float tilt;
 
+    float oldSpin;
+
     glm::vec3 eye;
+    
+    bool updated;
 
     bool lmb=false;
     bool mmb=false;

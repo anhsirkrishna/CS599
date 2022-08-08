@@ -23,8 +23,19 @@ void drawGUI(VkApp& VK)
 {
     ImGui::Text("Rate %.3f ms/frame (%.1f FPS)",
                 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+    ImGui::Text("Frame Count : %d", VK.app->frameCount);
 
     ImGui::Checkbox("Ray Tracer mode ", &VK.useRaytracer);
+    bool oldVal = VK.specularOn;
+    if (VK.useRaytracer) {
+        ImGui::Checkbox("Specular ", &VK.specularOn);
+        if (oldVal != VK.specularOn)
+            VK.specularToggled = true;
+    }
+    
+    ImGui::SliderFloat("Russian Roulette const", &VK.m_pcRay.rr, 0.0f, 1.0f);
+
+    ImGui::SliderFloat("Exposure", &VK.m_pcRay.emissionFactor, 0.1f, 2.0f);
 }
 #endif
 
@@ -47,7 +58,20 @@ int main(int argc, char** argv)
     while(!glfwWindowShouldClose(app->GLFW_window)) {
         glfwPollEvents();
         app->updateCamera();
-        
+        app->frameCount++;
+        VK.m_pcRay.clear = false;
+
+        if (app->myCamera.updated) {
+            VK.m_pcRay.clear = true;
+            VK.app->frameCount = 0;
+        }   
+
+        if (VK.specularToggled) {
+            VK.specularToggled = false;
+            VK.m_pcRay.clear = true;
+            VK.app->frameCount = 0;
+        }
+
         #ifdef GUI
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
@@ -133,9 +157,13 @@ void App::updateCamera()
     float dist = 0.7*dt;
 
     float rad = 3.14159/180;
-  
+    
+    myCamera.updated = false;
+
     myCamera.lmb   = glfwGetMouseButton(GLFW_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
-        
+    
+    vec3 oldEye = myCamera.eye;
+
     if (glfwGetKey(GLFW_window, GLFW_KEY_W) == GLFW_PRESS)
         myCamera.eye += dist*glm::vec3(sin(myCamera.spin*rad), 0.0, -cos(myCamera.spin*rad));
     if (glfwGetKey(GLFW_window, GLFW_KEY_S) == GLFW_PRESS)
@@ -148,12 +176,18 @@ void App::updateCamera()
         myCamera.eye += dist*glm::vec3(0,-1,0);
     if (glfwGetKey(GLFW_window, GLFW_KEY_C) == GLFW_PRESS)
         myCamera.eye += dist*glm::vec3(0,1,0);
+
+    if (oldEye != myCamera.eye)
+        myCamera.updated = true;
+
+    if (myCamera.lmb)
+        myCamera.updated = true;
 }
 
 App::App(int argc, char** argv)
 {
     doApiDump = false;
-
+    frameCount = 0;
     int argi = 1;
     while (argi<argc) {
         std::string arg = argv[argi++];
