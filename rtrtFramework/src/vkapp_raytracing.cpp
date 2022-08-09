@@ -22,6 +22,22 @@ void VkApp::createRtBuffers()
     m_rtColCurrBuffer = createBufferImage(windowSize);
     transitionImageLayout(m_rtColCurrBuffer.image, vk::Format::eR32G32B32A32Sfloat,
                           vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, 1);
+
+    m_rtColPrevBuffer = createBufferImage(windowSize);
+    transitionImageLayout(m_rtColPrevBuffer.image, vk::Format::eR32G32B32A32Sfloat,
+        vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, 1);
+
+    m_rtNDCurrBuffer = createBufferImage(windowSize);
+    transitionImageLayout(m_rtNDCurrBuffer.image, vk::Format::eR32G32B32A32Sfloat,
+        vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, 1);
+
+    m_rtNDPrevBuffer = createBufferImage(windowSize);
+    transitionImageLayout(m_rtNDPrevBuffer.image, vk::Format::eR32G32B32A32Sfloat,
+        vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, 1);
+
+    m_rtKdCurrBuffer = createBufferImage(windowSize);
+    transitionImageLayout(m_rtKdCurrBuffer.image, vk::Format::eR32G32B32A32Sfloat,
+        vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, 1);
     // @@ Destroy whatever buffers were created.  Note: There will
     // ultimately be far more than just this one.
 }
@@ -64,12 +80,24 @@ void VkApp::createRtDescriptorSet()
         {1, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eRaygenKHR},
         {2, vk::DescriptorType::eStorageBuffer, 1,
+         vk::ShaderStageFlagBits::eRaygenKHR},
+        {3, vk::DescriptorType::eStorageImage, 1,
+         vk::ShaderStageFlagBits::eRaygenKHR},
+        {4, vk::DescriptorType::eStorageImage, 1,
+         vk::ShaderStageFlagBits::eRaygenKHR},
+        {5, vk::DescriptorType::eStorageImage, 1,
+         vk::ShaderStageFlagBits::eRaygenKHR},
+        {6, vk::DescriptorType::eStorageImage, 1,
          vk::ShaderStageFlagBits::eRaygenKHR}
         });
 
     m_rtDesc.write(m_device, 0, m_rtBuilder.getAccelerationStructure());
     m_rtDesc.write(m_device, 1, m_rtColCurrBuffer.Descriptor());
     m_rtDesc.write(m_device, 2, m_lightBuff.buffer);
+    m_rtDesc.write(m_device, 3, m_rtColPrevBuffer.Descriptor());
+    m_rtDesc.write(m_device, 4, m_rtNDCurrBuffer.Descriptor());
+    m_rtDesc.write(m_device, 5, m_rtNDPrevBuffer.Descriptor());
+    m_rtDesc.write(m_device, 6, m_rtKdCurrBuffer.Descriptor());
 }
 
 // Pipeline for the ray tracer: all shaders, raygen, chit, miss
@@ -300,10 +328,8 @@ void VkApp::createRtShaderBindingTable()
 
 void VkApp::raytrace()
 {
-    // The (temporary) push constants for the ray tracing pipeline.
-    m_pcRay.tempLightPos = vec4(0.5f, 2.5f, 3.0f, 0.0);
-    m_pcRay.tempLightInt = vec4(2.5, 2.5, 2.5, 0.0);
-    m_pcRay.tempAmbient = vec4(0.2);
+    // The push constants for the ray tracing pipeline.
+    m_pcRay.alignmentTest = 1234;
 
     m_pcRay.depth = 1;
     while (float(rand()) / RAND_MAX < m_pcRay.rr)   m_pcRay.depth++;
@@ -342,6 +368,13 @@ void VkApp::raytrace()
     m_commandBuffer.traceRaysKHR(&m_rgenRegion, &m_missRegion, &m_hitRegion,
         &m_callRegion, windowSize.width, windowSize.height, 1);
 
+    cmdCopyImage(m_rtColCurrBuffer, m_scImageBuffer);
+    cmdCopyImage(m_rtColCurrBuffer, m_rtColPrevBuffer);
+    cmdCopyImage(m_rtNDCurrBuffer, m_rtNDPrevBuffer);
+
+}
+
+void VkApp::cmdCopyImage(ImageWrap& src, ImageWrap& dst) {
     // Copy the ray tracer output image to the scanline output image
     // -- because we already have the operations needed to display
     // that image on the screen.
@@ -350,26 +383,21 @@ void VkApp::raytrace()
     imageCopyRegion.srcSubresource.layerCount = 1;
     imageCopyRegion.dstSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
     imageCopyRegion.dstSubresource.layerCount = 1;
-    imageCopyRegion.extent.width              = windowSize.width;
-    imageCopyRegion.extent.height             = windowSize.height;
-    imageCopyRegion.extent.depth              = 1;
+    imageCopyRegion.extent.width = windowSize.width;
+    imageCopyRegion.extent.height = windowSize.height;
+    imageCopyRegion.extent.depth = 1;
 
-    imageLayoutBarrier(m_commandBuffer, m_rtColCurrBuffer.image, 
+    imageLayoutBarrier(m_commandBuffer, src.image,
         vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal);
-    imageLayoutBarrier(m_commandBuffer, m_scImageBuffer.image,
+    imageLayoutBarrier(m_commandBuffer, dst.image,
         vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferDstOptimal);
-    /*
-    vkCmdCopyImage(m_commandBuffer,
-                   m_rtColCurrBuffer.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                   m_scImageBuffer.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                   1, &imageCopyRegion);*/
-    m_commandBuffer.copyImage(m_rtColCurrBuffer.image, vk::ImageLayout::eTransferSrcOptimal,
-        m_scImageBuffer.image, vk::ImageLayout::eTransferDstOptimal,
+
+    m_commandBuffer.copyImage(src.image, vk::ImageLayout::eTransferSrcOptimal,
+        dst.image, vk::ImageLayout::eTransferDstOptimal,
         1, &imageCopyRegion);
 
-    imageLayoutBarrier(m_commandBuffer, m_scImageBuffer.image,
+    imageLayoutBarrier(m_commandBuffer, dst.image,
         vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eGeneral);
-    imageLayoutBarrier(m_commandBuffer, m_rtColCurrBuffer.image,
+    imageLayoutBarrier(m_commandBuffer, src.image,
         vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::eGeneral);
 }
-

@@ -20,6 +20,10 @@ layout(push_constant) uniform _PushConstantRay { PushConstantRay pcRay; };
 layout(set=0, binding=0) uniform accelerationStructureEXT topLevelAS;
 layout(set=0, binding=1, rgba32f) uniform image2D colCurr; // Output image: m_rtColCurrBuffer
 layout(set=0, binding=2, scalar) buffer _emitter { Emitter list[]; } emitter;
+layout(set=0, binding=3, rgba32f) uniform image2D colPrev; // Output image: m_rtColPrevBuffer
+layout(set=0, binding=4, rgba32f) uniform image2D NDCurr; // Output image: m_rtNDCurrBuffer
+layout(set=0, binding=5, rgba32f) uniform image2D NDPrev; // Output image: m_rtNDPrevBuffer
+layout(set=0, binding=6, rgba32f) uniform image2D KdCurr; // Output image: m_rtKdCurrBuffer
 
 // Object model descriptor set: 0: matrices, 1:object buffer addresses, 2: texture list
 layout(set=1, binding=0) uniform _MatrixUniforms { MatrixUniforms mats; };
@@ -150,8 +154,35 @@ float GeometryFactor(vec3 Pa, vec3 Na, vec3 Pb, vec3 Nb) {
     return abs((dot(D, Na) * dot(D, Nb)) / pow(dot(D, D), 2));
 }
 
+void accumulateSample(vec3 firstNrm, float firstDepth, ivec2 loc, 
+                      float bilinearWeight, inout vec4 sumC, inout float sumW) {
+    vec4 prevVal = imageLoad(colPrev, loc);
+    vec4 prevND = imageLoad(NDPrev, loc);
+    vec3 nrm = normalize(prevND.xyz);
+    float depth = prevND.w;
+
+    float nThreshold = 0.95f;
+    float dThreshold = 0.15f;
+
+    float w = bilinearWeight;
+
+    if (dot(firstNrm, nrm) < nThreshold) 
+        w = 0;
+    
+    if (abs(firstDepth - depth) > dThreshold) 
+        w = 0;
+
+    sumC += w*prevVal;
+    sumW += w;
+}
+
 void main() 
 {
+    if (pcRay.alignmentTest != 1234) {
+        imageStore(colCurr, ivec2(gl_LaunchIDEXT.xy), vec4(1,0,0,0));
+        return;
+    }
+
     // @@ In shaders/shared_structs.h add some random number functionality:
     //  To PushConstantRay add uint frameSeed and initialize to rand() % 32768 in VkApp::raytrace
     //  To RayPayload, add uint seed, and initialize like this:
@@ -168,6 +199,7 @@ void main()
     vec3 rayO    = eyeW;
     vec3 rayD = normalize(pixelW - eyeW);
     payload.hit = false;
+    payload.hitDist = 0;
 
     // @@  Most of the ray casting code goes in a loop:
     // Accumulate color in a vec3 C initialized to (0,0,0)
@@ -188,6 +220,11 @@ void main()
     float lightArea;
     vec3 lightNormal;
     vec3 lightEmission;
+
+    vec3 firstPos;
+    vec3 firstNrm;
+    vec3 firstColor;
+    float firstDepth;
 
     for (int i=0; i<pcRay.depth;  i++) {
         // Fire the ray;  hit or miss shaders will be invoked, passing results back in the payload
@@ -216,7 +253,7 @@ void main()
         lightEmission = emitter.list[randLight].emission;
 
         vec3 Wi = normalize(lightPoint - payload.hitPos);
-        float dist = length(lightPoint - payload.hitPos);
+        float lightDist = length(lightPoint - payload.hitPos);
         payload.occluded = true;
 
         traceRayEXT(topLevelAS, // acceleration structure
@@ -230,7 +267,7 @@ void main()
                     payload.hitPos, // ray origin !!!!
                     0.001, // ray min range
                     Wi, // ray direction !!!!
-                    dist-0.001, // ray max range !!!!
+                    lightDist-0.001, // ray max range !!!!
                     0 // payload (location = 0)
                     );
 
@@ -284,6 +321,14 @@ void main()
         vec3 N = normalize(nrm);  // Its normal
         vec3 Wo = -rayD;
 
+        //Recording first hit values
+        if (i == 0) {
+            firstPos = P;
+            firstNrm = N;
+            firstColor = mat.diffuse;
+            firstDepth = payload.hitDist;
+        }
+
         //Explicit light calculation
         if (!payload.occluded && pcRay.explicitPaths) {
             vec3 fe = EvalBrdf(N, Wi, Wo, mat);
@@ -306,19 +351,75 @@ void main()
         rayO = P;
         rayD = Wi;
     }
+    vec4 screenH = (mats.priorViewProj * vec4(firstPos, 1.0)); //Project to prev buffers
+    vec2 screen = ((screenH.xy/screenH.w) + vec2(1.0)) / 2.0; //H-division and map to [0,1]
 
     // @@Read, accumulate and write the value C into the proper image pixel
     
-    vec4 prevVal = imageLoad(colCurr, ivec2(gl_LaunchIDEXT.xy));
-    vec3 oldAve = prevVal.xyz;
-    float oldN = prevVal.w;
+    //vec4 prevVal = imageLoad(colCurr, ivec2(gl_LaunchIDEXT.xy));
+    //vec3 oldAve = prevVal.xyz;
+    //float oldN = prevVal.w;
+    vec3 oldAve;
+    float oldN;
+    vec4 sumC;
+    float sumW;
+
+    // If first… values were not defined, OR were defined but off-screen in Prev buffers:
+     if (firstDepth == 0.0
+        || screen.x < 0 || screen.x > 1 || screen.y < 0 || screen.y > 1) {
+         // Restart pixels accumulation with:
+         oldN = 0;
+         oldAve = vec3(0); 
+     }
+     else {
+         // Retrieve previous accumulation value as a selectively weighted
+         // bilinear interpolation of four neighboring pixels in colPrev buffer
+         vec2 floc = screen * gl_LaunchSizeEXT.xy - vec2(0.5);
+         vec2 off = fract(floc); // offset of current pixel between 4 neighbors.
+         ivec2 iloc = ivec2(floc); // (0,0) corner of the 4 neighbors.
+         // Accumulate 4 numerators(weight*color) and denominators (weights only)
+         sumC = vec4(0);
+         sumW = 0;
+         // Standard notation for the bilinear weights used in 4th parameter below
+         float x0 = 1.0-off.x, x1 = off.x, y0 = 1.0-off.y, y1 = off.y;
+         // Accumualate numerator and denominator across 4 pixels in a 2x2 pattern:
+         // See last page of document for details of accumulateSample.
+         accumulateSample(firstNrm, firstDepth, iloc+ivec2(0,0), x0*y0, sumC, sumW);
+         accumulateSample(firstNrm, firstDepth, iloc+ivec2(1,0), x1*y0, sumC, sumW);
+         accumulateSample(firstNrm, firstDepth, iloc+ivec2(0,1), x0*y1, sumC, sumW);
+         accumulateSample(firstNrm, firstDepth, iloc+ivec2(1,1), x1*y1, sumC, sumW);
+         // The interpolated history value is sumC/sumW, then split into average and count
+         // @@ Handle the denominator==0 case: Reset history with oldN=0, oldAve=(0,0,0);
+         if (sumW == 0) {
+            oldN = 0;
+            oldAve = vec3(0);
+         }
+         else {
+            vec4 history = sumC/sumW;
+            oldN = history.w;
+            oldAve = history.xyz;
+         }
+    }
+
     if (pcRay.clear) {
         oldAve = vec3(0, 0, 0);
         oldN = 0;
     }
+
     float newN = oldN + 1;
     vec3 newAve = oldAve + (C - oldAve)/newN;
+
+
+    if (any(isnan(newAve)))
+        newAve = vec3(1, 0, 0);
+    if (any(isnan(firstColor)))
+        newAve = vec3(1, 0, 0);
+    if (any(isnan(firstNrm)))
+        newAve = vec3(1, 0, 0);
+
     imageStore(colCurr, ivec2(gl_LaunchIDEXT.xy), vec4(newAve,newN));
+    imageStore(KdCurr, ivec2(gl_LaunchIDEXT.xy), vec4(firstColor, 0));
+    imageStore(NDCurr, ivec2(gl_LaunchIDEXT.xy), vec4(firstNrm, firstDepth));
 
     // @@ If the camera has moved, restart accumulation by setting (oldAve,oldN) to (0,0,0, 0)
     // Recognize camera motion at "spin +=" in camera.cpp or "myCamera.eye +=" in app.cpp

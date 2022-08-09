@@ -72,10 +72,11 @@ int main(int argc, char** argv)
         app->frameCount++;
         VK.m_pcRay.clear = false;
 
+        /*
         if (app->myCamera.updated) {
             VK.m_pcRay.clear = true;
             VK.app->frameCount = 0;
-        }   
+        }*/  
 
         if (VK.specularToggled) {
             VK.specularToggled = false;

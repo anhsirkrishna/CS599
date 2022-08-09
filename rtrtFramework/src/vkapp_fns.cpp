@@ -78,6 +78,10 @@ void VkApp::destroyAllVulkanResources()
 
     m_shaderBindingTableBW.destroy(m_device);
 
+    m_rtKdCurrBuffer.destroy(m_device);
+    m_rtNDPrevBuffer.destroy(m_device);
+    m_rtNDCurrBuffer.destroy(m_device);
+    m_rtColPrevBuffer.destroy(m_device);
     m_rtColCurrBuffer.destroy(m_device);
 
     m_rtDesc.destroy(m_device);
