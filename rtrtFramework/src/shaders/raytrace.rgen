@@ -19,6 +19,7 @@ layout(push_constant) uniform _PushConstantRay { PushConstantRay pcRay; };
 // Ray tracing descriptor set: 0:acceleration structure, and 1: color output image
 layout(set=0, binding=0) uniform accelerationStructureEXT topLevelAS;
 layout(set=0, binding=1, rgba32f) uniform image2D colCurr; // Output image: m_rtColCurrBuffer
+layout(set=0, binding=2, scalar) buffer _emitter { Emitter list[]; } emitter;
 
 // Object model descriptor set: 0: matrices, 1:object buffer addresses, 2: texture list
 layout(set=1, binding=0) uniform _MatrixUniforms { MatrixUniforms mats; };
@@ -127,6 +128,27 @@ float PdfBrdf(vec3 N, vec3 Wi) {
     return abs(dot(N, Wi)) / pi;
 }
 
+//Returns a random point on an emittor triangle
+vec3 SampleTriangle(vec3 A, vec3 B, vec3 C,inout uint seed) {
+    float b2 = rnd(seed);
+    float b1 = rnd(seed);
+    float b0 = 1 - b1 - b2;
+    if (b0 < 0) {
+        b1 = 1 - b1;
+        b2 = 1 - b2;
+        b0 = 1 - b1 - b2;
+    }
+    return b0*A + b1*B + b2*C;
+}
+
+float PdfLight(float area, int lightCount) {
+    return 1.0f/(area*lightCount);
+}
+
+float GeometryFactor(vec3 Pa, vec3 Na, vec3 Pb, vec3 Nb) {
+    vec3 D = Pa - Pb;
+    return abs((dot(D, Na) * dot(D, Nb)) / pow(dot(D, D), 2));
+}
 
 void main() 
 {
@@ -160,6 +182,12 @@ void main()
     //       m_pcRay.depth=1;
     //       while (float(rand())/RAND_MAX < m_pcRay.rr)   m_pcRay.depth++;
 
+    int randLight;
+    int lightCount = emitter.list.length();
+    vec3 lightPoint;
+    float lightArea;
+    vec3 lightNormal;
+    vec3 lightEmission;
 
     for (int i=0; i<pcRay.depth;  i++) {
         // Fire the ray;  hit or miss shaders will be invoked, passing results back in the payload
@@ -180,6 +208,34 @@ void main()
         if (!payload.hit) {
             break; }
 
+        //Explicit light path
+        randLight = int(lightCount * rnd(payload.seed));
+        lightPoint = SampleTriangle(emitter.list[randLight].v0, emitter.list[randLight].v1, emitter.list[randLight].v2, payload.seed);
+        lightArea = emitter.list[randLight].area;
+        lightNormal = emitter.list[randLight].normal;
+        lightEmission = emitter.list[randLight].emission;
+
+        vec3 Wi = normalize(lightPoint - payload.hitPos);
+        float dist = length(lightPoint - payload.hitPos);
+        payload.occluded = true;
+
+        traceRayEXT(topLevelAS, // acceleration structure
+                    gl_RayFlagsOpaqueEXT
+                    | gl_RayFlagsTerminateOnFirstHitEXT
+                    | gl_RayFlagsSkipClosestHitShaderEXT, // rayFlags !!!!
+                    0xFF, // cullMask
+                    0, // sbtRecordOffset
+                    0, // sbtRecordStride
+                    1, // missIndex !!!!
+                    payload.hitPos, // ray origin !!!!
+                    0.001, // ray min range
+                    Wi, // ray direction !!!!
+                    dist-0.001, // ray max range !!!!
+                    0 // payload (location = 0)
+                    );
+
+
+        // Normal light path
         // If something was hit, find the object data.
         // Object data (containing 4 device addresses)
         ObjDesc    objResources = objDesc.i[payload.instanceIndex];
@@ -202,7 +258,11 @@ void main()
         // ignored.  Scale it as necessary to produce a comfortable
         // image. Better yet, include a GUI slider to adjust exposure.
         if (dot(mat.emission,mat.emission) > 0.0) {
-            C += mat.emission*W * pcRay.emissionFactor; 
+            vec3 tempC = mat.emission*W * pcRay.emissionFactor;
+            if (pcRay.explicitPaths)
+                C += 0.5 * tempC;
+            else
+                C += tempC;
             break; }
 
         // Vertex of the triangle (Vertex has pos, nrm, tex)
@@ -219,12 +279,21 @@ void main()
         if (mat.textureId >= 0) {
             uint txtId = objResources.txtOffset + mat.textureId;
             mat.diffuse = texture(textureSamplers[(txtId)], uv).xyz; }
-
-        // From the current hit point, setup N,L,V for BRDF calculation
+        
         vec3 P = payload.hitPos;  // Current hit point
         vec3 N = normalize(nrm);  // Its normal
-        vec3 Wi = SampleBrdf(payload.seed, N);
         vec3 Wo = -rayD;
+
+        //Explicit light calculation
+        if (!payload.occluded && pcRay.explicitPaths) {
+            vec3 fe = EvalBrdf(N, Wi, Wo, mat);
+            float pe = PdfLight(lightArea, lightCount) / GeometryFactor(P, N, lightPoint, lightNormal);
+            C += 0.5 * W * (fe/pe) * lightEmission;
+        }
+
+
+        // From the current hit point, setup N,L,V for BRDF calculation
+        Wi = SampleBrdf(payload.seed, N);
         
         // Color via a BRDF calculation
         vec3 f = EvalBrdf(N, Wi, Wo, mat);

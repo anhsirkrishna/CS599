@@ -243,6 +243,8 @@ public:
     void prepareFrame();
     void ResetRtAccumulation();
     
+    BufferWrap m_lightBuff{};
+
     glm::mat4 m_priorViewProj{};
     void updateCameraBuffer();
     void rasterize();

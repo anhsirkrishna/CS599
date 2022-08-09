@@ -75,6 +75,9 @@ void VkApp::myloadModel(const std::string& filename, glm::mat4 transform)
     printf("matIndx: %ld\n", meshdata.matIndx.size());
     printf("textures: %ld\n", meshdata.textures.size());
     
+    std::vector<Emitter> emitterList;
+    Emitter tempEmitter;
+
     // @@ Go though the list of meshdata.materials, find the ones that
     // are emitters, and scale the emission up by a factor of 5.  The
     // model's original values produce very dark image.  We will have
@@ -91,6 +94,7 @@ void VkApp::myloadModel(const std::string& filename, glm::mat4 transform)
     //   vertices in meshdata.vertices, indexed by [3*i], [3*i+1], [3*i+2]
     //   and a material in meshdata.materials, indexed by meshdata.matIndx[i]
     std::vector<uint32_t> lightTriangleIndeces;
+    vec3 tempCross;
     for (int i = 0; i < meshdata.matIndx.size(); i++) {
         if (meshdata.materials[meshdata.matIndx[i]].emission.r > 0 ||
             meshdata.materials[meshdata.matIndx[i]].emission.g > 0 ||
@@ -101,6 +105,16 @@ void VkApp::myloadModel(const std::string& filename, glm::mat4 transform)
 
             //Store the index of the emittor 
             lightTriangleIndeces.push_back(i);
+
+            tempEmitter.v0 = meshdata.vertices[meshdata.indicies[3 * i + 0]].pos;
+            tempEmitter.v1 = meshdata.vertices[meshdata.indicies[3 * i + 1]].pos;
+            tempEmitter.v2 = meshdata.vertices[meshdata.indicies[3 * i + 2]].pos;
+            tempEmitter.emission = meshdata.materials[meshdata.matIndx[i]].emission;
+            tempEmitter.index = i;
+            tempCross = glm::cross((tempEmitter.v1 - tempEmitter.v0), (tempEmitter.v2 - tempEmitter.v0));
+            tempEmitter.normal = glm::normalize(tempCross);
+            tempEmitter.area = glm::length(tempCross) / 2;
+            emitterList.push_back(tempEmitter);
         }
     }
 
@@ -135,6 +149,16 @@ void VkApp::myloadModel(const std::string& filename, glm::mat4 transform)
     //submitTempCmdBuffer(cmdBuf);
     submitTemptCppCmdBuffer(cmdBuf);
     
+    //Create buffer for the emitter list and send it
+    cmdBuf = createTempCppCmdBuffer();
+    m_lightBuff = createBufferWrap(sizeof(emitterList[0]) * emitterList.size(), 
+        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst, 
+        vk::MemoryPropertyFlagBits::eDeviceLocal);
+
+    vkCmdUpdateBuffer(cmdBuf, m_lightBuff.buffer, 0,
+        sizeof(emitterList[0]) * emitterList.size(), emitterList.data());
+    submitTempCmdBuffer(cmdBuf);
+
     // Creates all textures on the GPU
     auto txtOffset = static_cast<uint32_t>(m_objText.size());  // Offset is current size
     for(const auto& texName : meshdata.textures)

@@ -31,6 +31,7 @@ void VkApp::initRayTracing()
 {
     m_pcRay.rr = 0.8;
     m_pcRay.emissionFactor = 1.2;
+    m_pcRay.explicitPaths = true;
     // Requesting ray tracing properties
     //VkPhysicalDeviceProperties2 prop2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
     //vk::PhysicalDeviceProperties2 prop2;
@@ -61,11 +62,14 @@ void VkApp::createRtDescriptorSet()
         {0, vk::DescriptorType::eAccelerationStructureKHR, 1,
          vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR},
         {1, vk::DescriptorType::eStorageImage, 1,
+         vk::ShaderStageFlagBits::eRaygenKHR},
+        {2, vk::DescriptorType::eStorageBuffer, 1,
          vk::ShaderStageFlagBits::eRaygenKHR}
         });
 
     m_rtDesc.write(m_device, 0, m_rtBuilder.getAccelerationStructure());
     m_rtDesc.write(m_device, 1, m_rtColCurrBuffer.Descriptor());
+    m_rtDesc.write(m_device, 2, m_lightBuff.buffer);
 }
 
 // Pipeline for the ray tracer: all shaders, raygen, chit, miss
@@ -115,6 +119,17 @@ void VkApp::createRtPipeline()
     group.generalShader = stages.size()-1;    // Index of miss shader
     groups.push_back(group);
     group.generalShader    = VK_SHADER_UNUSED_KHR;
+
+    stage.module = createShaderModule(loadFile("spv/raytraceShadow.rmiss.spv"));
+    //stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
+    stage.setStage(vk::ShaderStageFlagBits::eMissKHR);
+    stages.push_back(stage);
+
+    //group.type          = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+    group.setType(vk::RayTracingShaderGroupTypeKHR::eGeneral);
+    group.generalShader = stages.size() - 1;    // Index of miss shader
+    groups.push_back(group);
+    group.generalShader = VK_SHADER_UNUSED_KHR;
 
     // Closest hit shader stage and group appended to stages and groups lists
     stage.module = createShaderModule(loadFile("spv/raytrace.rchit.spv"));
@@ -185,7 +200,7 @@ constexpr integral align_up(integral x, size_t a) noexcept
 
 void VkApp::createRtShaderBindingTable()
 {
-    uint32_t missCount{1};
+    uint32_t missCount{2};
     uint32_t hitCount{1};
     auto     handleCount = 1 + missCount + hitCount;
 

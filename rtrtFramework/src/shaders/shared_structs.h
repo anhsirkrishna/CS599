@@ -90,6 +90,7 @@ struct PushConstantRay
 	float rr;
 	bool specular;
 	float emissionFactor;
+	bool explicitPaths;
 	vec4 tempLightPos; // TEMPORARY – vec4(0.5f, 2.5f, 3.0f, 0.0);
 	vec4 tempLightInt; // TEMPORARY -- vec4(2.5, 2.5, 2.5, 0.0);
 	vec4 tempAmbient; // TEMPORARY – vec4(0.2);
@@ -135,6 +136,16 @@ struct RayPayload
 	int instanceIndex; // Index of the object instance hit (we have only one, so =0)
 	int primitiveIndex; // Index of the hit triangle primitive within object
 	vec3 bc; // Barycentric coordinates of the hit point within triangle
+	bool occluded;
+};
+
+struct Emitter
+{
+	vec3 v0, v1, v2; // Vertices of light emitting triangle
+	vec3 emission; // Its emission
+	vec3 normal; // its normal
+	float area; // Its triangle area.
+	uint index; // Not needed, but used for verification
 };
 
 #endif

@@ -87,6 +87,8 @@ void VkApp::destroyAllVulkanResources()
 
     m_rtBuilder.destroy();
 
+    m_lightBuff.destroy(m_device);
+
     m_device.destroyPipelineLayout(m_scanlinePipelineLayout);
     m_device.destroyPipeline(m_scanlinePipeline);
 

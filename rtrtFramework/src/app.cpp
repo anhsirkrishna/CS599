@@ -33,9 +33,20 @@ void drawGUI(VkApp& VK)
             VK.specularToggled = true;
     }
     
+    oldVal = VK.m_pcRay.explicitPaths;
+    if (VK.useRaytracer) {
+        ImGui::Checkbox("Explicit Paths enabled ", &VK.m_pcRay.explicitPaths);
+        if (oldVal != VK.m_pcRay.explicitPaths)
+            VK.specularToggled = true;
+    }
+
     ImGui::SliderFloat("Russian Roulette const", &VK.m_pcRay.rr, 0.0f, 1.0f);
 
     ImGui::SliderFloat("Exposure", &VK.m_pcRay.emissionFactor, 0.1f, 2.0f);
+
+    if (ImGui::Button("Restart Accumulation")) {
+        VK.specularToggled = true;
+    }
 }
 #endif
 
